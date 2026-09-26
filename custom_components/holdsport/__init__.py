@@ -11,7 +11,11 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
-from homeassistant.helpers import config_validation as cv, device_registry as dr
+from homeassistant.helpers import (
+    config_validation as cv,
+    device_registry as dr,
+    entity_registry as er,
+)
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.loader import async_get_integration
@@ -34,6 +38,8 @@ from .coordinator import HoldsportCoordinator, Profile, resolve_device
 from .websocket import async_register_websocket
 
 PLATFORMS = [Platform.CALENDAR, Platform.SENSOR]
+# latest_message: Holdsports chat er ikke tilgængelig via API'et (fjernet i 0.4.0)
+REMOVED_SENSOR_KEYS = ("latest_message",)
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 SERVICE_SCHEMA = vol.Schema(
@@ -132,6 +138,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: HoldsportConfigEntry) ->
     for device in dr.async_entries_for_config_entry(dev_reg, entry.entry_id):
         if not device.identifiers & wanted:
             dev_reg.async_update_device(device.id, remove_config_entry_id=entry.entry_id)
+
+    # Entiteter fra tidligere versioner der ikke findes længere
+    ent_reg = er.async_get(hass)
+    for p in profiles:
+        for key in REMOVED_SENSOR_KEYS:
+            if entity_id := ent_reg.async_get_entity_id(
+                "sensor", DOMAIN, f"{account_id}_{p.id}_{key}"
+            ):
+                ent_reg.async_remove(entity_id)
 
     coordinator = HoldsportCoordinator(hass, entry, client, profiles)
     await coordinator.async_config_entry_first_refresh()

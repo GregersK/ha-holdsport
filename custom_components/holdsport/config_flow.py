@@ -20,6 +20,9 @@ from homeassistant.helpers.selector import (
     SelectOptionDict,
     SelectSelector,
     SelectSelectorConfig,
+    NumberSelector,
+    NumberSelectorConfig,
+    NumberSelectorMode,
     SelectSelectorMode,
     TextSelector,
     TextSelectorConfig,
@@ -27,7 +30,13 @@ from homeassistant.helpers.selector import (
 )
 
 from .api import HoldsportAuthError, HoldsportClient, HoldsportError
-from .const import CONF_PROFILES, DOMAIN
+from .const import (
+    CONF_MATCH_MEETING_MINUTES,
+    CONF_MATCH_MEETING_PLACES,
+    CONF_PROFILES,
+    DEFAULT_MATCH_MEETING_MINUTES,
+    DOMAIN,
+)
 
 USER_SCHEMA = vol.Schema(
     {
@@ -185,7 +194,15 @@ class HoldsportOptionsFlow(OptionsFlow):
         if user_input is not None:
             if user_input[CONF_PROFILES]:
                 return self.async_create_entry(
-                    data={CONF_PROFILES: [int(x) for x in user_input[CONF_PROFILES]]}
+                    data={
+                        CONF_PROFILES: [int(x) for x in user_input[CONF_PROFILES]],
+                        CONF_MATCH_MEETING_MINUTES: int(
+                            user_input.get(CONF_MATCH_MEETING_MINUTES) or 0
+                        ),
+                        CONF_MATCH_MEETING_PLACES: (
+                            user_input.get(CONF_MATCH_MEETING_PLACES) or ""
+                        ).strip(),
+                    }
                 )
             errors["base"] = "no_selection"
 
@@ -198,9 +215,30 @@ class HoldsportOptionsFlow(OptionsFlow):
         except HoldsportError:
             return self.async_abort(reason="cannot_connect")
 
-        current = [str(x) for x in self.config_entry.options.get(CONF_PROFILES, [])]
-        return self.async_show_form(
-            step_id="init",
-            data_schema=_profiles_schema(profiles, current),
-            errors=errors,
+        opts = self.config_entry.options
+        current = [str(x) for x in opts.get(CONF_PROFILES, [])]
+        schema = _profiles_schema(profiles, current).extend(
+            {
+                vol.Optional(
+                    CONF_MATCH_MEETING_MINUTES,
+                    default=opts.get(
+                        CONF_MATCH_MEETING_MINUTES, DEFAULT_MATCH_MEETING_MINUTES
+                    ),
+                ): NumberSelector(
+                    NumberSelectorConfig(
+                        min=0,
+                        max=240,
+                        step=5,
+                        mode=NumberSelectorMode.BOX,
+                        unit_of_measurement="min",
+                    )
+                ),
+                vol.Optional(
+                    CONF_MATCH_MEETING_PLACES,
+                    description={
+                        "suggested_value": opts.get(CONF_MATCH_MEETING_PLACES, "")
+                    },
+                ): TextSelector(),
+            }
         )
+        return self.async_show_form(step_id="init", data_schema=schema, errors=errors)

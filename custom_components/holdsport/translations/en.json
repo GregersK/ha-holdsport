@@ -41,8 +41,11 @@
       "init": {
         "title": "Family members",
         "data": {
-          "profiles": "Profiles"
-        }
+          "profiles": "Profiles",
+          "match_meeting_minutes": "Meeting time before matches (minutes, 0 = off)",
+          "match_meeting_places": "Only when the place contains (e.g. Odense – comma separated, empty = all matches)"
+        },
+        "description": "Choose family members. Meeting time before matches is only used when Holdsport has no meeting time for the match."
       }
     },
     "error": {
@@ -65,9 +68,6 @@
       },
       "unanswered": {
         "name": "Awaiting response"
-      },
-      "latest_message": {
-        "name": "Latest message"
       }
     }
   },

@@ -41,8 +41,11 @@
       "init": {
         "title": "Familiemedlemmer",
         "data": {
-          "profiles": "Profiler"
-        }
+          "profiles": "Profiler",
+          "match_meeting_minutes": "Mødetid før kampe (minutter, 0 = fra)",
+          "match_meeting_places": "Kun når stedet indeholder (fx Odense – kommasepareret, tom = alle kampe)"
+        },
+        "description": "Vælg familiemedlemmer. Mødetid før kampe bruges kun når Holdsport ikke selv har en mødetid på kampen."
       }
     },
     "error": {
@@ -65,9 +68,6 @@
       },
       "unanswered": {
         "name": "Mangler svar"
-      },
-      "latest_message": {
-        "name": "Seneste besked"
       }
     }
   },

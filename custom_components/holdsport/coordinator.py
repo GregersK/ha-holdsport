@@ -29,7 +29,11 @@ from .const import (
     ACTIVITIES_PER_PAGE,
     ATTENDING_STATUSES,
     CALENDAR_MAX_PAGES,
+    CONF_MATCH_MEETING_MINUTES,
+    CONF_MATCH_MEETING_PLACES,
+    DEFAULT_MATCH_MEETING_MINUTES,
     DOMAIN,
+    EVENT_TYPE_MATCH,
     STATUS_FROM_TEXT,
     STATUS_NONE,
     STATUS_TEXT,
@@ -48,24 +52,6 @@ class Profile:
     id: int
     name: str
     login: str
-
-
-@dataclass(slots=True)
-class Comment:
-    """En besked skrevet på en aktivitet (aktivitetens chat)."""
-
-    id: int
-    author: str
-    text: str
-    created: datetime
-
-    def as_dict(self) -> dict[str, Any]:
-        return {
-            "id": self.id,
-            "author": self.author,
-            "text": self.text,
-            "created": self.created.isoformat(),
-        }
 
 
 @dataclass(slots=True)
@@ -90,7 +76,8 @@ class Activity:
     action_path: str
     attending: int = 0
     max_attendees: int | None = None
-    comments: list[Comment] = field(default_factory=list)
+    # Beregnet ud fra integrationens indstillinger – kun når Holdsport ikke har en mødetid
+    meeting_start: datetime | None = None
 
     @property
     def status_text(self) -> str:
@@ -117,6 +104,7 @@ class Activity:
             "meeting_place": self.pickup_place,
             "comment": self.comment,
             "can_respond": self.can_respond,
+            "meeting_start": self.meeting_start.isoformat() if self.meeting_start else None,
         }
 
     def as_card_dict(self) -> dict[str, Any]:
@@ -126,7 +114,6 @@ class Activity:
             "event_type_id": self.event_type_id,
             "attending": self.attending,
             "max_attendees": self.max_attendees,
-            "comments": [c.as_dict() for c in self.comments],
         }
 
 
@@ -146,21 +133,6 @@ def parse_status(value: Any) -> int:
         return STATUS_FROM_TEXT.get(value.strip().lower(), STATUS_NONE)
     return STATUS_NONE
 
-
-def parse_comments(raw_list: Any) -> list[Comment]:
-    comments: list[Comment] = []
-    for raw in raw_list if isinstance(raw_list, list) else []:
-        text = (raw.get("comment") or "").strip()
-        created = dt_util.parse_datetime(raw.get("created_at") or "")
-        if not text or created is None or raw.get("id") is None:
-            continue
-        if created.tzinfo is None:
-            created = created.replace(tzinfo=dt_util.get_default_time_zone())
-        comments.append(
-            Comment(int(raw["id"]), (raw.get("name") or "").strip(), text, created)
-        )
-    comments.sort(key=lambda c: c.created)
-    return comments
 
 
 def count_attending(raw_list: Any) -> int:
@@ -207,8 +179,29 @@ def parse_activity(raw: dict[str, Any], team_id: int, team_name: str) -> Activit
         action_path=raw.get("action_path") or "",
         attending=count_attending(raw.get("activities_users")),
         max_attendees=raw.get("max_attendees") or None,
-        comments=parse_comments(raw.get("comments")),
     )
+
+
+def match_meeting_start(
+    act: Activity, minutes: int, places: list[str]
+) -> datetime | None:
+    """Beregnet mødetid for en kamp: `minutes` før start.
+
+    Kun for kampe uden mødetid fra Holdsport, og – hvis `places` er udfyldt –
+    kun når stedet indeholder et af navnene (fx hjemmebanen "Odense").
+    """
+    if minutes <= 0 or act.all_day or act.event_type_id != EVENT_TYPE_MATCH:
+        return None
+    if act.pickup_time:
+        return None
+    place = act.place.casefold()
+    if places and not any(p.casefold() in place for p in places):
+        return None
+    return act.start - timedelta(minutes=minutes)
+
+
+def parse_places(value: str | None) -> list[str]:
+    return [p.strip() for p in (value or "").split(",") if p.strip()]
 
 
 def resolve_device(
@@ -256,6 +249,18 @@ class HoldsportCoordinator(DataUpdateCoordinator[dict[int, ProfileData]]):
         )
         self.client = client
         self.profiles = {p.id: p for p in profiles}
+        self.meeting_minutes = int(
+            entry.options.get(CONF_MATCH_MEETING_MINUTES, DEFAULT_MATCH_MEETING_MINUTES)
+        )
+        self.meeting_places = parse_places(entry.options.get(CONF_MATCH_MEETING_PLACES))
+
+    def _parse(self, raw: dict[str, Any], team_id: int, team_name: str) -> Activity | None:
+        act = parse_activity(raw, team_id, team_name)
+        if act is not None:
+            act.meeting_start = match_meeting_start(
+                act, self.meeting_minutes, self.meeting_places
+            )
+        return act
 
     async def _async_update_data(self) -> dict[int, ProfileData]:
         today = dt_util.now().date()
@@ -274,7 +279,7 @@ class HoldsportCoordinator(DataUpdateCoordinator[dict[int, ProfileData]]):
                         per_page=ACTIVITIES_PER_PAGE,
                     )
                     for raw in raw_list:
-                        act = parse_activity(raw, team_id, team_name)
+                        act = self._parse(raw, team_id, team_name)
                         # Klubaktiviteter kan optræde på flere hold
                         if act is not None and act.id not in seen:
                             seen.add(act.id)
@@ -311,7 +316,7 @@ class HoldsportCoordinator(DataUpdateCoordinator[dict[int, ProfileData]]):
                         break
                     last_start: datetime | None = None
                     for raw in raw_list:
-                        act = parse_activity(raw, team_id, team_name)
+                        act = self._parse(raw, team_id, team_name)
                         if act is None:
                             continue
                         last_start = act.start
