@@ -65,6 +65,9 @@
       },
       "unanswered": {
         "name": "Mangler svar"
+      },
+      "latest_message": {
+        "name": "Seneste besked"
       }
     }
   },

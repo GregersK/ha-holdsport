@@ -7,13 +7,14 @@ from datetime import date, datetime, timedelta
 import logging
 from typing import Any
 
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import (
     ConfigEntryAuthFailed,
     HomeAssistantError,
     ServiceValidationError,
 )
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
@@ -26,6 +27,7 @@ from .api import (
 )
 from .const import (
     ACTIVITIES_PER_PAGE,
+    ATTENDING_STATUSES,
     CALENDAR_MAX_PAGES,
     DOMAIN,
     STATUS_FROM_TEXT,
@@ -49,6 +51,24 @@ class Profile:
 
 
 @dataclass(slots=True)
+class Comment:
+    """En besked skrevet på en aktivitet (aktivitetens chat)."""
+
+    id: int
+    author: str
+    text: str
+    created: datetime
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "author": self.author,
+            "text": self.text,
+            "created": self.created.isoformat(),
+        }
+
+
+@dataclass(slots=True)
 class Activity:
     """En aktivitet set fra én profils perspektiv."""
 
@@ -68,6 +88,9 @@ class Activity:
     pickup_time: str
     action_method: str
     action_path: str
+    attending: int = 0
+    max_attendees: int | None = None
+    comments: list[Comment] = field(default_factory=list)
 
     @property
     def status_text(self) -> str:
@@ -96,6 +119,16 @@ class Activity:
             "can_respond": self.can_respond,
         }
 
+    def as_card_dict(self) -> dict[str, Any]:
+        """Alt dashboard-kortet skal bruge, inkl. beskeder."""
+        return {
+            **self.as_attributes(),
+            "event_type_id": self.event_type_id,
+            "attending": self.attending,
+            "max_attendees": self.max_attendees,
+            "comments": [c.as_dict() for c in self.comments],
+        }
+
 
 @dataclass(slots=True)
 class ProfileData:
@@ -112,6 +145,30 @@ def parse_status(value: Any) -> int:
             return int(value)
         return STATUS_FROM_TEXT.get(value.strip().lower(), STATUS_NONE)
     return STATUS_NONE
+
+
+def parse_comments(raw_list: Any) -> list[Comment]:
+    comments: list[Comment] = []
+    for raw in raw_list if isinstance(raw_list, list) else []:
+        text = (raw.get("comment") or "").strip()
+        created = dt_util.parse_datetime(raw.get("created_at") or "")
+        if not text or created is None or raw.get("id") is None:
+            continue
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=dt_util.get_default_time_zone())
+        comments.append(
+            Comment(int(raw["id"]), (raw.get("name") or "").strip(), text, created)
+        )
+    comments.sort(key=lambda c: c.created)
+    return comments
+
+
+def count_attending(raw_list: Any) -> int:
+    return sum(
+        1
+        for u in (raw_list if isinstance(raw_list, list) else [])
+        if parse_status(u.get("status_code", u.get("status"))) in ATTENDING_STATUSES
+    )
 
 
 def parse_activity(raw: dict[str, Any], team_id: int, team_name: str) -> Activity | None:
@@ -148,7 +205,34 @@ def parse_activity(raw: dict[str, Any], team_id: int, team_name: str) -> Activit
         pickup_time=raw.get("pickup_time") or "",
         action_method=(raw.get("action_method") or "").upper(),
         action_path=raw.get("action_path") or "",
+        attending=count_attending(raw.get("activities_users")),
+        max_attendees=raw.get("max_attendees") or None,
+        comments=parse_comments(raw.get("comments")),
     )
+
+
+def resolve_device(
+    hass: HomeAssistant, device_id: str
+) -> tuple[HoldsportCoordinator, int]:
+    """Find coordinator og profil-id for en Holdsport-enhed."""
+    device = dr.async_get(hass).async_get(device_id)
+    if device is None:
+        raise ServiceValidationError("Ukendt enhed")
+
+    ident = next((i[1] for i in device.identifiers if i[0] == DOMAIN), None)
+    entry = next(
+        (
+            e
+            for e_id in device.config_entries
+            if (e := hass.config_entries.async_get_entry(e_id)) is not None
+            and e.domain == DOMAIN
+            and e.state is ConfigEntryState.LOADED
+        ),
+        None,
+    )
+    if ident is None or entry is None:
+        raise ServiceValidationError("Enheden er ikke en aktiv Holdsport-profil")
+    return entry.runtime_data.coordinator, int(ident.rsplit("_", 1)[1])
 
 
 class HoldsportCoordinator(DataUpdateCoordinator[dict[int, ProfileData]]):

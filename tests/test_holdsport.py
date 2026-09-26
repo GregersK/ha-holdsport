@@ -47,8 +47,26 @@ def _act(aid, name, days, type_id, type_name, status=0, method="POST", path=None
     }
 
 
+def _training_with_chat():
+    act = _act(1, "Træning", 1, 2, "Træning")
+    act["activities_users"] = [
+        {"id": 1, "name": "A", "status": "Tilmeldt", "status_code": 1},
+        {"id": 2, "name": "B", "status": "Afmeldt", "status_code": 2},
+        {"id": 3, "name": "C", "status": "Udvalgt", "status_code": 4},
+    ]
+    act["max_attendees"] = 20
+    act["comments"] = [
+        # bevidst ude af rækkefølge; tom besked springes over
+        {"id": 12, "created_at": _iso(-1, 10), "user_id": 7, "name": "Træner Jens",
+         "comment": "Husk <b>skøjter</b>"},
+        {"id": 11, "created_at": _iso(-2, 10), "user_id": 8, "name": "Mor", "comment": "Hej"},
+        {"id": 13, "created_at": _iso(-1, 11), "user_id": 9, "name": "X", "comment": "  "},
+    ]
+    return act
+
+
 CHILD_ACTS = [
-    _act(1, "Træning", 1, 2, "Træning"),
+    _training_with_chat(),
     _act(2, "Kamp mod B93", 3, 1, "Kamp", status=1, method="PUT",
          path="/v1/activities/2/activities_users/999"),
     _act(3, "Stævne", 5, 4, "Stævne", end=False, hour=0),
@@ -217,3 +235,46 @@ async def test_auth_failure_starts_reauth(hass: HomeAssistant):
     await hass.async_block_till_done()
     assert entry.data[CONF_PASSWORD] == "pw"
     assert entry.state is config_entries.ConfigEntryState.LOADED
+
+
+async def test_latest_message_sensor(hass: HomeAssistant):
+    await _setup(hass)
+    state = hass.states.get("sensor.emma_latest_message")
+    assert state.state == "Husk <b>skøjter</b>"
+    assert state.attributes["author"] == "Træner Jens"
+    assert state.attributes["activity_id"] == 1
+    assert state.attributes["comment_id"] == 12
+    assert hass.states.get("sensor.gregers_kissow_latest_message").state == "unknown"
+
+
+async def test_websocket_subscribe(hass: HomeAssistant, hass_ws_client):
+    await _setup(hass)
+    client = await hass_ws_client(hass)
+
+    await client.send_json({"id": 1, "type": "holdsport/subscribe", "entity_id": "calendar.emma"})
+    result = await client.receive_json()
+    assert result["success"], result
+    event = (await client.receive_json())["event"]
+
+    dev = next(d for d in dr.async_get(hass).devices.values() if d.name == "Emma")
+    assert event["device_id"] == dev.id
+    assert event["name"] == "Emma"
+    assert event["available"] is True
+    acts = {a["activity_id"]: a for a in event["activities"]}
+    assert list(acts) == [1, 2, 3, 4]
+    training = acts[1]
+    assert training["attending"] == 2  # Tilmeldt + Udvalgt
+    assert training["max_attendees"] == 20
+    assert [c["id"] for c in training["comments"]] == [11, 12]
+    assert training["comments"][1]["author"] == "Træner Jens"
+    assert acts[4]["can_respond"] is False
+
+    # Opdatering af coordinatoren skubbes ud til kortet
+    coordinator = hass.config_entries.async_entries(DOMAIN)[0].runtime_data.coordinator
+    await coordinator.async_refresh()
+    assert (await client.receive_json())["event"]["name"] == "Emma"
+
+    await client.send_json({"id": 2, "type": "holdsport/subscribe", "entity_id": "sensor.findes_ikke"})
+    result = await client.receive_json()
+    assert not result["success"]
+    assert result["error"]["code"] == "not_found"

@@ -65,6 +65,9 @@
       },
       "unanswered": {
         "name": "Awaiting response"
+      },
+      "latest_message": {
+        "name": "Latest message"
       }
     }
   },
