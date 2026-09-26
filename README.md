@@ -11,11 +11,13 @@ Custom integration der viser træning, kampe og andre aktiviteter fra [Holdsport
 - **Holdsport-kort til dashboardet** med kommende aktiviteter, ✓/✗-knapper og aktivitetens beskeder (se nedenfor).
 - **Seneste besked** pr. person – nyeste besked skrevet på en kommende aktivitet, fx til notifikationer.
 
+## Holdsport i sidemenuen
+
+Integrationen tilføjer selv **Holdsport** i HA's sidemenu med ét kort pr. familiemedlem – ingen opsætning. Efter opdatering: genstart HA og genindlæs browseren (Ctrl+F5).
+
 ## Dashboard-kort
 
-Kortet følger med integrationen og indlæses automatisk – der skal ikke installeres noget ekstra. Efter opdatering: genstart HA og genindlæs browseren.
-
-Rediger dashboard → *Tilføj kort* → søg efter **Holdsport**, eller i YAML:
+Samme kort kan også lægges på et dashboard. Rediger dashboard → *Tilføj kort* → søg efter **Holdsport**, eller i YAML (kortet skal stå under en visnings `cards:`):
 
 ```yaml
 type: custom:holdsport-card

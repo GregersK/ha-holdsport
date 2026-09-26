@@ -465,6 +465,93 @@ const STYLE = `
   @media (max-width: 450px) { .details { padding-left: 10px; } }
 `;
 
+// Sidepanel ("Holdsport" i sidemenuen): ét kort pr. familiemedlem, uden opsætning.
+// Profilerne findes ud fra integrationens kalendere i entity-registret.
+class HoldsportPanel extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: "open" });
+    this._cards = new Map(); // entity_id -> holdsport-card
+    this._key = null;
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    this._update();
+  }
+
+  set narrow(narrow) {
+    this._narrow = narrow;
+    const btn = this.shadowRoot.querySelector("ha-menu-button");
+    if (btn) btn.narrow = narrow;
+  }
+
+  set panel(_panel) {}
+
+  _calendars() {
+    return Object.values(this._hass.entities || {})
+      .filter((e) => e.platform === "holdsport" && e.entity_id.startsWith("calendar."))
+      .map((e) => e.entity_id)
+      .sort((a, b) => this._name(a).localeCompare(this._name(b)));
+  }
+
+  _name(entityId) {
+    const st = this._hass.states[entityId];
+    return (st && st.attributes.friendly_name) || entityId;
+  }
+
+  _update() {
+    if (!this._hass) return;
+    const cals = this._calendars();
+    const key = cals.join(",");
+    if (key !== this._key) {
+      this._key = key;
+      this._build(cals);
+    }
+    const btn = this.shadowRoot.querySelector("ha-menu-button");
+    if (btn) btn.hass = this._hass;
+    for (const card of this._cards.values()) card.hass = this._hass;
+  }
+
+  _build(cals) {
+    this.shadowRoot.innerHTML = `
+      <style>
+        :host { display: block; min-height: 100vh; background: var(--primary-background-color); }
+        .toolbar {
+          display: flex; align-items: center; height: 56px; padding: 0 12px; gap: 4px;
+          background: var(--app-header-background-color, var(--primary-color));
+          color: var(--app-header-text-color, #fff); font-size: 20px;
+        }
+        .grid {
+          display: grid; gap: 16px; padding: 16px; box-sizing: border-box;
+          grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); align-items: start;
+        }
+        @media (max-width: 420px) { .grid { grid-template-columns: 1fr; padding: 8px; gap: 8px; } }
+        .empty { padding: 24px; color: var(--secondary-text-color); }
+      </style>
+      <div class="toolbar"><ha-menu-button></ha-menu-button><span>Holdsport</span></div>
+      <div class="grid"></div>`;
+    const btn = this.shadowRoot.querySelector("ha-menu-button");
+    btn.narrow = this._narrow;
+    const grid = this.shadowRoot.querySelector(".grid");
+    this._cards = new Map();
+    if (!cals.length) {
+      grid.innerHTML = `<div class="empty">Ingen Holdsport-profiler fundet. Tilføj integrationen under Enheder og tjenester.</div>`;
+      return;
+    }
+    for (const entity of cals) {
+      const card = document.createElement("holdsport-card");
+      card.setConfig({ entity, days: 30 });
+      grid.appendChild(card);
+      this._cards.set(entity, card);
+    }
+  }
+}
+
+if (!customElements.get("holdsport-panel")) {
+  customElements.define("holdsport-panel", HoldsportPanel);
+}
+
 if (!customElements.get("holdsport-card")) {
   customElements.define("holdsport-card", HoldsportCard);
   window.customCards = window.customCards || [];

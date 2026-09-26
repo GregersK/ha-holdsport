@@ -27,6 +27,9 @@ tests/             pytest-homeassistant-custom-component, FakeClient mocker API'
 - Serveres fra `/holdsport_static/holdsport-card.js?v=<manifest-version>` og indlæses via
   `add_extra_js_url` i `async_setup`. **Bump `version` i manifest.json ved ændringer i kortet**,
   ellers bruger browseren den cachede udgave.
+- Samme modul definerer `holdsport-panel`, registreret med `panel_custom` som sidemenu-punktet
+  "Holdsport" (`/holdsport`). Panelet finder profilerne via `hass.entities` (platform holdsport,
+  domæne calendar) og viser et `holdsport-card` pr. profil.
 - Registreringen springes over, når `hass.http`/`frontend` ikke er sat op (tests).
 - Kortet abonnerer med `entity_id` (typisk kalenderen) → entity registry → device → `resolve_device()`.
   Til/afmelding går gennem de almindelige services, så validering og fejltekster er ét sted.

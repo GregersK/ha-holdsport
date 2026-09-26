@@ -81,7 +81,21 @@ async def _async_register_card(hass: HomeAssistant) -> None:
     )
     integration = await async_get_integration(hass, DOMAIN)
     # Versionen i URL'en tvinger browseren til at hente kortet igen efter opdatering
-    add_extra_js_url(hass, f"{CARD_URL_BASE}/{CARD_FILENAME}?v={integration.version}")
+    url = f"{CARD_URL_BASE}/{CARD_FILENAME}?v={integration.version}"
+    add_extra_js_url(hass, url)
+
+    # "Holdsport" i sidemenuen: et kort pr. familiemedlem, uden dashboard-opsætning
+    from homeassistant.components import panel_custom
+
+    await panel_custom.async_register_panel(
+        hass,
+        frontend_url_path=DOMAIN,
+        webcomponent_name="holdsport-panel",
+        sidebar_title="Holdsport",
+        sidebar_icon="mdi:calendar-account",
+        module_url=url,
+        require_admin=False,
+    )
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: HoldsportConfigEntry) -> bool:
