@@ -15,6 +15,8 @@ const STATUS_ATTENDING = 1;
 const STATUS_DECLINED = 2;
 const STATUS_SELECTED = 4;
 
+const UNLIMITED_ATTENDEES = 999;
+
 const SEEN_KEY = "holdsport-card-seen";
 
 const esc = (s) =>
@@ -214,11 +216,13 @@ class HoldsportCard extends HTMLElement {
   }
 
   _locale() {
-    return (this._hass && this._hass.locale && this._hass.locale.language) || "da";
+    // Kortets tekster er danske, så datoer og tider formateres også på dansk
+    // uanset HA-brugerens sprog (ellers fås "04:30 PM" midt i dansk tekst)
+    return "da-DK";
   }
 
   _fmtTime(d) {
-    return d.toLocaleTimeString(this._locale(), { hour: "2-digit", minute: "2-digit" });
+    return d.toLocaleTimeString(this._locale(), { hour: "2-digit", minute: "2-digit", hour12: false });
   }
 
   _dayLabel(d) {
@@ -244,10 +248,11 @@ class HoldsportCard extends HTMLElement {
       month: "short",
       hour: "2-digit",
       minute: "2-digit",
+      hour12: false,
     });
   }
 
-  _statusChip(code, canRespond) {
+  _statusChip(code, canRespond, text) {
     if (!canRespond && code === STATUS_NONE) {
       // Fx betalingsaktiviteter – de kræver Holdsport-appen og tæller ikke som ubesvarede
       return `<span class="chip app" title="Kan kun besvares i Holdsport-appen">Svar i appen</span>`;
@@ -262,7 +267,8 @@ class HoldsportCard extends HTMLElement {
       case STATUS_NONE:
         return `<span class="chip none">Mangler svar</span>`;
       default:
-        return "";
+        // Statuskoder vi ikke kender betydningen af endnu – vis Holdsports egen tekst
+        return text ? `<span class="chip other">${esc(text)}</span>` : "";
     }
   }
 
@@ -284,7 +290,8 @@ class HoldsportCard extends HTMLElement {
           act.meeting_place ? ` · ${esc(act.meeting_place)}` : ""
         }</div>`
       : "";
-    const count = act.max_attendees
+    // Holdsport bruger 999 som "ingen grænse"
+    const count = act.max_attendees && act.max_attendees < UNLIMITED_ATTENDEES
       ? `${act.attending}/${act.max_attendees}`
       : act.attending
         ? `${act.attending}`
@@ -332,7 +339,7 @@ class HoldsportCard extends HTMLElement {
           <div class="main">
             <div class="name">${esc(act.name)}</div>
             <div class="meta">${meta}${count ? ` · <ha-icon icon="mdi:account-multiple"></ha-icon>${count}` : ""}</div>
-            <div class="tags">${this._statusChip(status, act.can_respond)}${msgBadge}</div>
+            <div class="tags">${this._statusChip(status, act.can_respond, pending === undefined ? act.status : "")}${msgBadge}</div>
           </div>
           <div class="actions">${buttons}</div>
         </div>
@@ -447,7 +454,7 @@ const STYLE = `
   .rsvp.yes.on { background: var(--success-color, #43a047); border-color: transparent; color: #fff; }
   .rsvp.no.on { background: var(--error-color, #db4437); border-color: transparent; color: #fff; }
   .rsvp:disabled { opacity: 0.5; cursor: progress; }
-  .chip.app { background: var(--disabled-color, #9e9e9e); }
+  .chip.app, .chip.other { background: var(--disabled-color, #9e9e9e); }
   .details { padding: 0 10px 10px 64px; font-size: 0.9em; }
   .meeting { color: var(--secondary-text-color); margin-bottom: 6px; }
   .desc { white-space: pre-wrap; margin-bottom: 8px; font-style: italic; overflow-wrap: anywhere; }
