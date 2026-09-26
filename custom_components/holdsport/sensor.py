@@ -18,8 +18,11 @@ from homeassistant.util import dt as dt_util
 
 from . import HoldsportConfigEntry
 from .const import EVENT_TYPE_MATCH, EVENT_TYPE_TRAINING, STATUS_NONE
-from .coordinator import Activity
+from .coordinator import Activity, Comment
 from .entity import HoldsportEntity
+
+# Grænsen for en entity-state i HA
+MAX_STATE_LENGTH = 255
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -61,6 +64,7 @@ async def async_setup_entry(
             HoldsportNextSensor(rt.coordinator, rt.account_id, pid, d) for d in NEXT_SENSORS
         )
         entities.append(HoldsportUnansweredSensor(rt.coordinator, rt.account_id, pid))
+        entities.append(HoldsportLatestMessageSensor(rt.coordinator, rt.account_id, pid))
     async_add_entities(entities)
 
 
@@ -134,4 +138,53 @@ class HoldsportUnansweredSensor(HoldsportEntity, SensorEntity):
                 }
                 for a in self._pending()
             ]
+        }
+
+
+class HoldsportLatestMessageSensor(HoldsportEntity, SensorEntity):
+    """Nyeste besked skrevet på en af profilens kommende aktiviteter.
+
+    Staten er beskedteksten, så en automation kan sende den videre som
+    notifikation, når den ændrer sig.
+    """
+
+    _attr_translation_key = "latest_message"
+
+    def __init__(self, coordinator, account_id, profile_id) -> None:
+        super().__init__(coordinator, account_id, profile_id, "latest_message")
+
+    def _latest(self) -> tuple[Activity, Comment] | None:
+        pdata = self.profile_data
+        if pdata is None:
+            return None
+        return max(
+            ((a, c) for a in pdata.activities for c in a.comments),
+            key=lambda ac: ac[1].created,
+            default=None,
+        )
+
+    @property
+    def native_value(self) -> str | None:
+        latest = self._latest()
+        if latest is None:
+            return None
+        text = " ".join(latest[1].text.split())
+        if len(text) > MAX_STATE_LENGTH:
+            text = text[: MAX_STATE_LENGTH - 1] + "…"
+        return text
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        latest = self._latest()
+        if latest is None:
+            return None
+        act, comment = latest
+        return {
+            "author": comment.author,
+            "created": comment.created.isoformat(),
+            "message": comment.text,
+            "comment_id": comment.id,
+            "activity": act.name,
+            "activity_id": act.id,
+            "activity_start": act.start.isoformat(),
         }

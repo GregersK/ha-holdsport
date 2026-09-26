@@ -26,6 +26,9 @@ STATUS_DECLINED = 2
 STATUS_SELECTED = 4
 STATUS_UNKNOWN = 5
 
+# Tæller med i "antal tilmeldte" på kortet
+ATTENDING_STATUSES = (STATUS_ATTENDING, STATUS_SELECTED)
+
 STATUS_TEXT = {
     STATUS_NONE: "Ikke svaret",
     STATUS_ATTENDING: "Tilmeldt",
@@ -47,6 +50,9 @@ STATUS_FROM_TEXT = {
 # 1 = tilmeld er dokumenteret. 2 = afmeld svarer til status_code 2 ("Afmeldt").
 JOINED_ATTEND = 1
 JOINED_DECLINE = 2
+
+CARD_URL_BASE = "/holdsport_static"
+CARD_FILENAME = "holdsport-card.js"
 
 SERVICE_ATTEND = "attend"
 SERVICE_DECLINE = "decline"

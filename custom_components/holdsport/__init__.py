@@ -3,25 +3,25 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigEntry, ConfigEntryState
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, Platform
 from homeassistant.core import HomeAssistant, ServiceCall
-from homeassistant.exceptions import (
-    ConfigEntryAuthFailed,
-    ConfigEntryNotReady,
-    ServiceValidationError,
-)
+from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv, device_registry as dr
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.typing import ConfigType
+from homeassistant.loader import async_get_integration
 
 from .api import HoldsportAuthError, HoldsportClient, HoldsportError
 from .const import (
     ATTR_ACTIVITY_ID,
     ATTR_DEVICE_ID,
+    CARD_FILENAME,
+    CARD_URL_BASE,
     CONF_PROFILES,
     DOMAIN,
     JOINED_ATTEND,
@@ -30,7 +30,8 @@ from .const import (
     SERVICE_DECLINE,
     device_identifier,
 )
-from .coordinator import HoldsportCoordinator, Profile
+from .coordinator import HoldsportCoordinator, Profile, resolve_device
+from .websocket import async_register_websocket
 
 PLATFORMS = [Platform.CALENDAR, Platform.SENSOR]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
@@ -56,32 +57,31 @@ type HoldsportConfigEntry = ConfigEntry[HoldsportRuntime]
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     async def _handle(call: ServiceCall) -> None:
         joined = JOINED_ATTEND if call.service == SERVICE_ATTEND else JOINED_DECLINE
-        device = dr.async_get(hass).async_get(call.data[ATTR_DEVICE_ID])
-        if device is None:
-            raise ServiceValidationError("Ukendt enhed")
-
-        ident = next((i[1] for i in device.identifiers if i[0] == DOMAIN), None)
-        entry = next(
-            (
-                e
-                for e_id in device.config_entries
-                if (e := hass.config_entries.async_get_entry(e_id)) is not None
-                and e.domain == DOMAIN
-                and e.state is ConfigEntryState.LOADED
-            ),
-            None,
-        )
-        if ident is None or entry is None:
-            raise ServiceValidationError("Enheden er ikke en aktiv Holdsport-profil")
-
-        profile_id = int(ident.rsplit("_", 1)[1])
-        await entry.runtime_data.coordinator.async_respond(
-            profile_id, call.data[ATTR_ACTIVITY_ID], joined
-        )
+        coordinator, profile_id = resolve_device(hass, call.data[ATTR_DEVICE_ID])
+        await coordinator.async_respond(profile_id, call.data[ATTR_ACTIVITY_ID], joined)
 
     for service in (SERVICE_ATTEND, SERVICE_DECLINE):
         hass.services.async_register(DOMAIN, service, _handle, schema=SERVICE_SCHEMA)
+
+    async_register_websocket(hass)
+    await _async_register_card(hass)
     return True
+
+
+async def _async_register_card(hass: HomeAssistant) -> None:
+    """Server dashboard-kortet og indlæs det automatisk i frontend."""
+    # Ikke tilgængeligt i tests / minimale opsætninger uden frontend
+    if hass.http is None or "frontend" not in hass.config.components:
+        return
+    from homeassistant.components.frontend import add_extra_js_url
+    from homeassistant.components.http import StaticPathConfig
+
+    await hass.http.async_register_static_paths(
+        [StaticPathConfig(CARD_URL_BASE, str(Path(__file__).parent / "frontend"), True)]
+    )
+    integration = await async_get_integration(hass, DOMAIN)
+    # Versionen i URL'en tvinger browseren til at hente kortet igen efter opdatering
+    add_extra_js_url(hass, f"{CARD_URL_BASE}/{CARD_FILENAME}?v={integration.version}")
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: HoldsportConfigEntry) -> bool:

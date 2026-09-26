@@ -8,6 +8,27 @@ Custom integration der viser træning, kampe og andre aktiviteter fra [Holdsport
 - **Kalender pr. person** (`calendar.<navn>`) med alle aktiviteter på tværs af hold – også historik, når man bladrer tilbage.
 - **Sensorer pr. person:** Næste aktivitet, Næste træning, Næste kamp (timestamp + attributter som hold, sted, mødetid, status og `activity_id`) samt **Mangler svar** (antal kommende aktiviteter uden svar).
 - **Handlinger:** `holdsport.attend` (tilmeld) og `holdsport.decline` (afmeld).
+- **Holdsport-kort til dashboardet** med kommende aktiviteter, ✓/✗-knapper og aktivitetens beskeder (se nedenfor).
+- **Seneste besked** pr. person – nyeste besked skrevet på en kommende aktivitet, fx til notifikationer.
+
+## Dashboard-kort
+
+Kortet følger med integrationen og indlæses automatisk – der skal ikke installeres noget ekstra. Efter opdatering: genstart HA og genindlæs browseren.
+
+Rediger dashboard → *Tilføj kort* → søg efter **Holdsport**, eller i YAML:
+
+```yaml
+type: custom:holdsport-card
+entity: calendar.emma      # personens Holdsport-kalender
+days: 14                   # valgfri, standard 14
+show_messages: true        # valgfri
+title: Emma                # valgfri, standard er profilens navn
+```
+
+- Aktiviteter grupperet pr. dag, farvet efter type (kamp blå, træning grøn, stævne rød, medlemsaktivitet pink).
+- ✓/✗ tilmelder/afmelder med det samme. Betalingsaktiviteter vises som *Svar i appen*.
+- Tryk på en aktivitet for at se mødetid, beskrivelse og beskederne. Nye beskeder markeres med en prik (huskes pr. browser).
+- Beskeder kan kun læses. Holdsports API har kun beskeder knyttet til aktiviteter – holdchat og private beskeder er ikke tilgængelige.
 
 ## Installation
 
