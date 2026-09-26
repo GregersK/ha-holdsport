@@ -1,0 +1,12 @@
+{
+  "domain": "holdsport",
+  "name": "Holdsport",
+  "codeowners": ["@GregersK"],
+  "config_flow": true,
+  "documentation": "https://github.com/GregersK/ha-holdsport",
+  "integration_type": "hub",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/GregersK/ha-holdsport/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}

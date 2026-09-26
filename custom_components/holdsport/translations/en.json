@@ -1,0 +1,101 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Holdsport",
+        "description": "Log in with your Holdsport account. Profiles you manage (e.g. children) can be selected in the next step.",
+        "data": {
+          "username": "Username / e-mail",
+          "password": "Password"
+        }
+      },
+      "profiles": {
+        "title": "Select family members",
+        "description": "Each selected profile becomes a device with a calendar and sensors.",
+        "data": {
+          "profiles": "Profiles"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate",
+        "description": "Enter the password for {username}.",
+        "data": {
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid username or password",
+      "cannot_connect": "Could not connect to Holdsport",
+      "no_profiles": "The account has no profiles",
+      "no_selection": "Select at least one profile"
+    },
+    "abort": {
+      "already_configured": "Account is already configured",
+      "reauth_successful": "Re-authentication successful",
+      "wrong_account": "This is a different Holdsport account"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Family members",
+        "data": {
+          "profiles": "Profiles"
+        }
+      }
+    },
+    "error": {
+      "no_selection": "Select at least one profile"
+    },
+    "abort": {
+      "cannot_connect": "Could not connect to Holdsport"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "next_activity": {
+        "name": "Next activity"
+      },
+      "next_training": {
+        "name": "Next training"
+      },
+      "next_match": {
+        "name": "Next match"
+      },
+      "unanswered": {
+        "name": "Awaiting response"
+      }
+    }
+  },
+  "services": {
+    "attend": {
+      "name": "Attend",
+      "description": "Sign a family member up for an activity.",
+      "fields": {
+        "device_id": {
+          "name": "Family member",
+          "description": "The Holdsport profile (device)."
+        },
+        "activity_id": {
+          "name": "Activity ID",
+          "description": "Found in the activity_id attribute of the sensors."
+        }
+      }
+    },
+    "decline": {
+      "name": "Decline",
+      "description": "Decline an activity for a family member.",
+      "fields": {
+        "device_id": {
+          "name": "Family member",
+          "description": "The Holdsport profile (device)."
+        },
+        "activity_id": {
+          "name": "Activity ID",
+          "description": "Found in the activity_id attribute of the sensors."
+        }
+      }
+    }
+  }
+}

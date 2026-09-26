@@ -1,0 +1,101 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Holdsport",
+        "description": "Log ind med din Holdsport-konto. Profiler du administrerer (fx børn) kan vælges i næste trin.",
+        "data": {
+          "username": "Brugernavn / e-mail",
+          "password": "Password"
+        }
+      },
+      "profiles": {
+        "title": "Vælg familiemedlemmer",
+        "description": "Hver valgt profil bliver en enhed med kalender og sensorer.",
+        "data": {
+          "profiles": "Profiler"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Log ind igen",
+        "description": "Indtast password for {username}.",
+        "data": {
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Forkert brugernavn eller password",
+      "cannot_connect": "Kunne ikke forbinde til Holdsport",
+      "no_profiles": "Kontoen har ingen profiler",
+      "no_selection": "Vælg mindst én profil"
+    },
+    "abort": {
+      "already_configured": "Kontoen er allerede sat op",
+      "reauth_successful": "Login opdateret",
+      "wrong_account": "Det er en anden Holdsport-konto"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Familiemedlemmer",
+        "data": {
+          "profiles": "Profiler"
+        }
+      }
+    },
+    "error": {
+      "no_selection": "Vælg mindst én profil"
+    },
+    "abort": {
+      "cannot_connect": "Kunne ikke forbinde til Holdsport"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "next_activity": {
+        "name": "Næste aktivitet"
+      },
+      "next_training": {
+        "name": "Næste træning"
+      },
+      "next_match": {
+        "name": "Næste kamp"
+      },
+      "unanswered": {
+        "name": "Mangler svar"
+      }
+    }
+  },
+  "services": {
+    "attend": {
+      "name": "Tilmeld",
+      "description": "Tilmeld et familiemedlem til en aktivitet.",
+      "fields": {
+        "device_id": {
+          "name": "Familiemedlem",
+          "description": "Holdsport-profilen (enheden)."
+        },
+        "activity_id": {
+          "name": "Aktivitets-id",
+          "description": "Findes i attributten activity_id på sensorerne."
+        }
+      }
+    },
+    "decline": {
+      "name": "Afmeld",
+      "description": "Afmeld et familiemedlem fra en aktivitet.",
+      "fields": {
+        "device_id": {
+          "name": "Familiemedlem",
+          "description": "Holdsport-profilen (enheden)."
+        },
+        "activity_id": {
+          "name": "Aktivitets-id",
+          "description": "Findes i attributten activity_id på sensorerne."
+        }
+      }
+    }
+  }
+}
