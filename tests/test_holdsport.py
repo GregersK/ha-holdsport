@@ -13,6 +13,11 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.holdsport.api import HoldsportAuthError, HoldsportRejected
 from custom_components.holdsport.const import CONF_PROFILES, DOMAIN
+from custom_components.holdsport.coordinator import (
+    match_meeting_start,
+    parse_activity,
+    parse_places,
+)
 
 PARENT, CHILD = 100, 200
 PROFILES = [
@@ -47,7 +52,7 @@ def _act(aid, name, days, type_id, type_name, status=0, method="POST", path=None
     }
 
 
-def _training_with_chat():
+def _training_with_attendees():
     act = _act(1, "Træning", 1, 2, "Træning")
     act["activities_users"] = [
         {"id": 1, "name": "A", "status": "Tilmeldt", "status_code": 1},
@@ -55,23 +60,20 @@ def _training_with_chat():
         {"id": 3, "name": "C", "status": "Udvalgt", "status_code": 4},
     ]
     act["max_attendees"] = 20
-    act["comments"] = [
-        # bevidst ude af rækkefølge; tom besked springes over
-        {"id": 12, "created_at": _iso(-1, 10), "user_id": 7, "name": "Træner Jens",
-         "comment": "Husk <b>skøjter</b>"},
-        {"id": 11, "created_at": _iso(-2, 10), "user_id": 8, "name": "Mor", "comment": "Hej"},
-        {"id": 13, "created_at": _iso(-1, 11), "user_id": 9, "name": "X", "comment": "  "},
-    ]
     return act
 
 
 CHILD_ACTS = [
-    _training_with_chat(),
+    _training_with_attendees(),
     _act(2, "Kamp mod B93", 3, 1, "Kamp", status=1, method="PUT",
          path="/v1/activities/2/activities_users/999"),
     _act(3, "Stævne", 5, 4, "Stævne", end=False, hour=0),
     _act(4, "Betaling", 6, 9, "Medlemsaktivitet", method="GET",
          path="http://holdsport.dk/sign_in/x"),
+    # hjemmekamp uden mødetid fra Holdsport -> mødetid kan beregnes
+    {**_act(5, "Kamp i Odense", 8, 1, "Kamp", status=1, method="PUT",
+            path="/v1/activities/5/activities_users/998"),
+     "place": "Spar Nord Arena, Odense", "pickup_time": ""},
 ]
 
 
@@ -120,12 +122,12 @@ def patch_client():
         yield
 
 
-async def _setup(hass, profiles=(PARENT, CHILD)):
+async def _setup(hass, profiles=(PARENT, CHILD), **extra_options):
     entry = MockConfigEntry(
         domain=DOMAIN,
         unique_id=str(PARENT),
         data={CONF_USERNAME: "g@x.dk", CONF_PASSWORD: "pw"},
-        options={CONF_PROFILES: list(profiles)},
+        options={CONF_PROFILES: list(profiles), **extra_options},
     )
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
@@ -178,7 +180,9 @@ async def test_calendar_events(hass: HomeAssistant):
         blocking=True, return_response=True,
     )
     events = res["calendar.emma"]["events"]
-    assert [e["summary"] for e in events] == ["Træning", "Kamp mod B93", "Stævne", "Betaling"]
+    assert [e["summary"] for e in events] == [
+        "Træning", "Kamp mod B93", "Stævne", "Betaling", "Kamp i Odense"
+    ]
     staevne = events[2]
     assert "T" not in staevne["start"]  # heldag
     assert "Hold: U10 piger" in events[0]["description"]
@@ -212,8 +216,14 @@ async def test_options_removes_device(hass: HomeAssistant):
     entry = await _setup(hass)
     r = await hass.config_entries.options.async_init(entry.entry_id)
     assert r["step_id"] == "init"
-    r = await hass.config_entries.options.async_configure(r["flow_id"], {CONF_PROFILES: [str(CHILD)]})
+    r = await hass.config_entries.options.async_configure(
+        r["flow_id"],
+        {CONF_PROFILES: [str(CHILD)], "match_meeting_minutes": 90, "match_meeting_places": " Odense "},
+    )
     assert r["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options == {
+        CONF_PROFILES: [CHILD], "match_meeting_minutes": 90, "match_meeting_places": "Odense"
+    }
     await hass.async_block_till_done()
     names = [d.name for d in dr.async_get(hass).devices.values() if any(i[0] == DOMAIN for i in d.identifiers)]
     assert names == ["Emma"]
@@ -237,14 +247,43 @@ async def test_auth_failure_starts_reauth(hass: HomeAssistant):
     assert entry.state is config_entries.ConfigEntryState.LOADED
 
 
-async def test_latest_message_sensor(hass: HomeAssistant):
+async def test_match_meeting_time(hass: HomeAssistant):
+    await _setup(hass, match_meeting_minutes=90, match_meeting_places="odense, Vojens")
+    rt = hass.config_entries.async_entries(DOMAIN)[0].runtime_data
+    acts = {a.id: a for a in rt.coordinator.data[CHILD].activities}
+    home = acts[5]
+    assert home.meeting_start == home.start - timedelta(minutes=90)
+    assert acts[2].meeting_start is None  # Holdsport har selv en mødetid (17:30)
+    assert acts[1].meeting_start is None  # træning
+
+    res = await hass.services.async_call(
+        "calendar", "get_events",
+        {"entity_id": "calendar.emma", "start_date_time": dt_util.now().isoformat(),
+         "end_date_time": (dt_util.now() + timedelta(days=30)).isoformat()},
+        blocking=True, return_response=True,
+    )
+    ev = next(e for e in res["calendar.emma"]["events"] if e["summary"] == "Kamp i Odense")
+    local = dt_util.as_local(home.meeting_start)
+    assert f"Mødetid: {local:%H.%M}" in ev["description"]
+
+
+def test_match_meeting_start_rules():
+    raw = _act(9, "Kamp", 2, 1, "Kamp", hour=14)
+    raw.update(place="Aalborg Skøjtehal", pickup_time="")
+    away = parse_activity(raw, 1, "U14")
+    assert match_meeting_start(away, 90, ["Odense"]) is None
+    assert match_meeting_start(away, 90, []) == away.start - timedelta(minutes=90)
+    assert match_meeting_start(away, 0, []) is None
+    assert parse_places(" Odense, ,Vojens ") == ["Odense", "Vojens"]
+
+
+async def test_removed_sensor_is_cleaned_up(hass: HomeAssistant):
+    from homeassistant.helpers import entity_registry as er
+
+    ent_reg = er.async_get(hass)
+    old = ent_reg.async_get_or_create("sensor", DOMAIN, f"{PARENT}_{CHILD}_latest_message")
     await _setup(hass)
-    state = hass.states.get("sensor.emma_latest_message")
-    assert state.state == "Husk <b>skøjter</b>"
-    assert state.attributes["author"] == "Træner Jens"
-    assert state.attributes["activity_id"] == 1
-    assert state.attributes["comment_id"] == 12
-    assert hass.states.get("sensor.gregers_kissow_latest_message").state == "unknown"
+    assert ent_reg.async_get(old.entity_id) is None
 
 
 async def test_websocket_subscribe(hass: HomeAssistant, hass_ws_client):
@@ -261,12 +300,12 @@ async def test_websocket_subscribe(hass: HomeAssistant, hass_ws_client):
     assert event["name"] == "Emma"
     assert event["available"] is True
     acts = {a["activity_id"]: a for a in event["activities"]}
-    assert list(acts) == [1, 2, 3, 4]
+    assert list(acts) == [1, 2, 3, 4, 5]
     training = acts[1]
     assert training["attending"] == 2  # Tilmeldt + Udvalgt
     assert training["max_attendees"] == 20
-    assert [c["id"] for c in training["comments"]] == [11, 12]
-    assert training["comments"][1]["author"] == "Træner Jens"
+    assert "comments" not in training
+    assert training["meeting_start"] is None  # slået fra som standard
     assert acts[4]["can_respond"] is False
 
     # Opdatering af coordinatoren skubbes ud til kortet

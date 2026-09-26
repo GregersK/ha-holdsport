@@ -8,8 +8,8 @@ Custom integration der viser træning, kampe og andre aktiviteter fra [Holdsport
 - **Kalender pr. person** (`calendar.<navn>`) med alle aktiviteter på tværs af hold – også historik, når man bladrer tilbage.
 - **Sensorer pr. person:** Næste aktivitet, Næste træning, Næste kamp (timestamp + attributter som hold, sted, mødetid, status og `activity_id`) samt **Mangler svar** (antal kommende aktiviteter uden svar).
 - **Handlinger:** `holdsport.attend` (tilmeld) og `holdsport.decline` (afmeld).
-- **Holdsport-kort til dashboardet** med kommende aktiviteter, ✓/✗-knapper og aktivitetens beskeder (se nedenfor).
-- **Seneste besked** pr. person – nyeste besked skrevet på en kommende aktivitet, fx til notifikationer.
+- **Holdsport-kort** i sidemenuen og til dashboards med kommende aktiviteter, ✓/✗-knapper og mødetid (se nedenfor).
+- **Mødetid før kampe** kan beregnes automatisk, fx 90 min. før hjemmekampe (se *Indstillinger*).
 
 ## Holdsport i sidemenuen
 
@@ -23,14 +23,21 @@ Samme kort kan også lægges på et dashboard. Rediger dashboard → *Tilføj ko
 type: custom:holdsport-card
 entity: calendar.emma      # personens Holdsport-kalender
 days: 14                   # valgfri, standard 14
-show_messages: true        # valgfri
 title: Emma                # valgfri, standard er profilens navn
 ```
 
 - Aktiviteter grupperet pr. dag, farvet efter type (kamp blå, træning grøn, stævne rød, medlemsaktivitet pink).
 - ✓/✗ tilmelder/afmelder med det samme. Betalingsaktiviteter vises som *Svar i appen*.
-- Tryk på en aktivitet for at se mødetid, beskrivelse og beskederne. Nye beskeder markeres med en prik (huskes pr. browser).
-- Beskeder kan kun læses. Holdsports API har kun beskeder knyttet til aktiviteter – holdchat og private beskeder er ikke tilgængelige.
+- Mødetid står i parentes under klokkeslættet, fx `12.45 (11.15)`. Tryk på en aktivitet for mødested og beskrivelse.
+- Holdsports chat er ikke tilgængelig via API'et og vises derfor ikke.
+
+## Indstillinger
+
+Under integrationens **Konfigurer**:
+
+- **Familiemedlemmer** der skal vises.
+- **Mødetid før kampe (minutter)** – fx 90. Bruges kun på kampe, hvor Holdsport ikke selv har en mødetid. 0 = fra.
+- **Kun når stedet indeholder** – fx `Odense` for kun hjemmekampe. Flere steder adskilles med komma; tom = alle kampe.
 
 ## Installation
 

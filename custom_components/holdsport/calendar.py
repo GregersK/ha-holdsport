@@ -34,6 +34,8 @@ def to_event(act: Activity) -> CalendarEvent:
     ]
     if act.pickup_time or act.pickup_place:
         lines.append(f"Mødetid: {act.pickup_time} {act.pickup_place}".rstrip())
+    elif act.meeting_start:
+        lines.append(f"Mødetid: {dt_util.as_local(act.meeting_start):%H.%M}")
     if act.comment:
         lines.append("")
         lines.append(act.comment)

@@ -12,10 +12,10 @@ custom_components/holdsport/
   coordinator.py   Profile/Activity/ProfileData, parse_activity, polling, fetch_range, respond
   entity.py        base-entity: én enhed pr. profil
   calendar.py      kalender pr. profil (historik via async_fetch_range)
-  sensor.py        next_activity / next_training / next_match (timestamp) + unanswered + latest_message
+  sensor.py        next_activity / next_training / next_match (timestamp) + unanswered
   config_flow.py   login -> vælg profiler; reauth; options (til/fravalg af profiler)
   const.py         konstanter, status-/eventtype-koder, device_identifier()
-  websocket.py     holdsport/subscribe: skubber en profils aktiviteter (inkl. beskeder) til kortet
+  websocket.py     holdsport/subscribe: skubber en profils aktiviteter til kortet
   frontend/holdsport-card.js  dashboard-kort (vanilla web component, ingen build-step)
   translations/    da.json + en.json (ingen strings.json – custom integration)
 tests/             pytest-homeassistant-custom-component, FakeClient mocker API'et
@@ -33,8 +33,10 @@ tests/             pytest-homeassistant-custom-component, FakeClient mocker API'
 - Registreringen springes over, når `hass.http`/`frontend` ikke er sat op (tests).
 - Kortet abonnerer med `entity_id` (typisk kalenderen) → entity registry → device → `resolve_device()`.
   Til/afmelding går gennem de almindelige services, så validering og fejltekster er ét sted.
-- Beskedtekster kommer fra andre brugere: al tekst skal gennem `esc()` før den sættes i innerHTML.
-- "Set"-status for beskeder ligger i browserens localStorage – ren bekvemmelighed.
+- Tekst fra Holdsport (navne, steder, beskrivelser) skal gennem `esc()` før den sættes i innerHTML.
+- Tider formateres altid med `da-DK` (kortets tekster er danske), uanset HA-brugerens sprog.
+- Mødetid: options `match_meeting_minutes`/`match_meeting_places` → `match_meeting_start()` i
+  coordinatoren sætter `Activity.meeting_start` for kampe uden `pickup_time`. Vises i kort og kalender.
 - Kan ikke unit-testes her (ingen node); afprøv i en browser med en stub af `hass.connection`.
 
 ## Holdsport API – verificerede fakta
@@ -54,8 +56,10 @@ Demo-login `demo:demo` virker mod `https://api.holdsport.dk/v1/` (read-only brug
 - Ændring af fortidig aktivitet giver 422.
 - `actions`-arrayet er i praksis tomt – brug det ikke til at afgøre mulige handlinger.
 - Aktiviteter kl. 00:00 uden `endtime` behandles som heldag.
-- `comments[]` på hver aktivitet = aktivitetens chat: `{id, created_at, user_id, name, comment}`.
-  Holdchat og private beskeder findes ikke i API'et (kun i web-appens interne API – brug det ikke).
+- `comments[]` er tom på rigtige konti (kun demo-kontoens gamle data har indhold). Holdsports chat
+  findes ikke i API'et – kun i web-appens interne API, som vi ikke bruger. Beskeder blev fjernet i 0.4.0.
+- `max_attendees` 999 = ingen grænse.
+- `status` 3 = "Til rådighed" (udledt af web-appens statusliste, ikke bekræftet i API-docs). 5 = "Ukendt".
 - `activities_users[].status_code` bruges til antal tilmeldte (1 Tilmeldt + 4 Udvalgt).
 
 ## Ikke verificeret

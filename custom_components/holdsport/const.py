@@ -8,6 +8,10 @@ DOMAIN = "holdsport"
 API_BASE = "https://api.holdsport.dk"
 
 CONF_PROFILES = "profiles"
+# Beregnet mødetid før kampe (når Holdsport ikke selv har en mødetid)
+CONF_MATCH_MEETING_MINUTES = "match_meeting_minutes"
+CONF_MATCH_MEETING_PLACES = "match_meeting_places"
+DEFAULT_MATCH_MEETING_MINUTES = 0  # 0 = slået fra
 
 UPDATE_INTERVAL = timedelta(minutes=15)
 ACTIVITIES_PER_PAGE = 50
@@ -23,6 +27,7 @@ EVENT_TYPE_MEMBER_ACTIVITY = 9  # Medlemsaktivitet
 STATUS_NONE = 0
 STATUS_ATTENDING = 1
 STATUS_DECLINED = 2
+STATUS_AVAILABLE = 3  # "Til rådighed" – udledt af web-appens statusliste
 STATUS_SELECTED = 4
 STATUS_UNKNOWN = 5
 
@@ -33,6 +38,7 @@ STATUS_TEXT = {
     STATUS_NONE: "Ikke svaret",
     STATUS_ATTENDING: "Tilmeldt",
     STATUS_DECLINED: "Afmeldt",
+    STATUS_AVAILABLE: "Til rådighed",
     STATUS_SELECTED: "Udvalgt",
     STATUS_UNKNOWN: "Ukendt",
 }
@@ -42,6 +48,7 @@ STATUS_FROM_TEXT = {
     "ej tilkendegivet": STATUS_NONE,
     "tilmeldt": STATUS_ATTENDING,
     "afmeldt": STATUS_DECLINED,
+    "til rådighed": STATUS_AVAILABLE,
     "udvalgt": STATUS_SELECTED,
     "ukendt": STATUS_UNKNOWN,
 }
