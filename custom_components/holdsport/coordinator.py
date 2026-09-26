@@ -330,6 +330,53 @@ class HoldsportCoordinator(DataUpdateCoordinator[dict[int, ProfileData]]):
             raise HomeAssistantError(f"Kunne ikke hente fra Holdsport: {err}") from err
         return sorted(found.values(), key=lambda a: a.start)
 
+    def _login(self, profile_id: int) -> str:
+        pdata = (self.data or {}).get(profile_id)
+        if pdata is None:
+            raise ServiceValidationError("Profilen er ikke aktiv i integrationen")
+        return pdata.profile.login
+
+    async def async_get_tasks(self, profile_id: int, activity_id: int) -> list[dict[str, Any]]:
+        """Aktivitetens opgaver set fra profilens side."""
+        login = self._login(profile_id)
+        try:
+            raw_list = await self.client.async_get_tasks(login, activity_id)
+        except HoldsportNotFound:
+            return []
+        except HoldsportError as err:
+            raise HomeAssistantError(f"Kunne ikke hente opgaver: {err}") from err
+        tasks = []
+        for raw in raw_list:
+            taken = raw.get("activity_tasks") or []
+            max_p = raw.get("max_participants") or None
+            mine = any(t.get("user_id") == profile_id for t in taken)
+            full = max_p is not None and len(taken) >= max_p
+            tasks.append(
+                {
+                    "id": int(raw["id"]),
+                    "name": (raw.get("name") or "").strip(),
+                    "max_participants": max_p,
+                    "taken_by": [t.get("name") or "" for t in taken],
+                    "mine": mine,
+                    "can_take": bool(raw.get("enable_attend")) and not full and not mine,
+                }
+            )
+        return tasks
+
+    async def async_take_task(self, profile_id: int, activity_id: int, task_id: int) -> None:
+        login = self._login(profile_id)
+        try:
+            await self.client.async_take_task(login, activity_id, task_id)
+        except HoldsportRejected as err:
+            raise HomeAssistantError(
+                "Holdsport afviste opgaven (fx fuld, eller den kan ikke vælges selv)"
+            ) from err
+        except HoldsportAuthError as err:
+            self.config_entry.async_start_reauth(self.hass)
+            raise HomeAssistantError("Login til Holdsport fejlede") from err
+        except HoldsportError as err:
+            raise HomeAssistantError(f"Fejl fra Holdsport: {err}") from err
+
     async def async_respond(
         self, profile_id: int, activity_id: int, joined_status: int
     ) -> None:

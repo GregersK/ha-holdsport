@@ -1,5 +1,5 @@
 // Holdsport-kort til Home Assistant.
-// Viser en profils kommende aktiviteter med til-/afmelding og mødetid.
+// Viser en profils kommende aktiviteter med til-/afmelding, mødetid og opgaver.
 // Data kommer live fra integrationen via websocket-kommandoen holdsport/subscribe.
 
 const TYPE_COLORS = {
@@ -59,6 +59,7 @@ class HoldsportCard extends HTMLElement {
     this._error = null;
     this._expanded = new Set();
     this._pending = new Map(); // activity_id -> joined_status der er sendt
+    this._tasks = new Map(); // activity_id -> {loading, error, list, busy}
     this.shadowRoot.addEventListener("click", (ev) => this._onClick(ev));
   }
 
@@ -145,8 +146,29 @@ class HoldsportCard extends HTMLElement {
         this._expanded.delete(id);
       } else {
         this._expanded.add(id);
+        this._loadTasks(id);
       }
       this._render();
+      return;
+    }
+
+    if (action === "task") {
+      ev.stopPropagation();
+      const taskId = Number(el.dataset.task);
+      const entry = this._tasks.get(id);
+      if (!entry || entry.busy || !this._data) return;
+      entry.busy = taskId;
+      this._render();
+      try {
+        await this._hass.callService("holdsport", "take_task", {
+          device_id: this._data.device_id,
+          activity_id: id,
+          task_id: taskId,
+        });
+      } catch (err) {
+        this._toast(err && err.message ? err.message : "Holdsport afviste opgaven");
+      }
+      await this._loadTasks(id);
       return;
     }
 
@@ -171,6 +193,58 @@ class HoldsportCard extends HTMLElement {
         if (this._pending.delete(id)) this._render();
       }, 5000);
     }
+  }
+
+  // Opgaver hentes først når aktiviteten foldes ud (de er ikke med i aktivitetslisten)
+  async _loadTasks(id) {
+    if (!this._data) return;
+    const prev = this._tasks.get(id);
+    this._tasks.set(id, { loading: !prev || !prev.list, list: prev && prev.list });
+    this._render();
+    try {
+      const list = await this._hass.connection.sendMessagePromise({
+        type: "holdsport/tasks",
+        device_id: this._data.device_id,
+        activity_id: id,
+      });
+      this._tasks.set(id, { list });
+    } catch (err) {
+      this._tasks.set(id, { error: (err && err.message) || "Kunne ikke hente opgaver" });
+    }
+    this._render();
+  }
+
+  _renderTasks(act) {
+    const entry = this._tasks.get(act.activity_id);
+    if (!entry) return "";
+    if (entry.loading) return `<div class="tasks-note">Henter opgaver…</div>`;
+    if (entry.error) return `<div class="tasks-note">${esc(entry.error)}</div>`;
+    if (!entry.list || !entry.list.length) return "";
+    const rows = entry.list
+      .map((task) => {
+        const n = task.taken_by.length;
+        const count = task.max_participants ? `${n}/${task.max_participants}` : `${n}`;
+        const full = task.max_participants && n >= task.max_participants;
+        let action;
+        if (task.mine) {
+          action = `<span class="chip ok">Din opgave</span>`;
+        } else if (task.can_take) {
+          const busy = entry.busy === task.id ? "disabled" : "";
+          action = `<button class="take" data-action="task" data-id="${act.activity_id}" data-task="${task.id}" ${busy}>Tag opgaven</button>`;
+        } else {
+          action = `<span class="chip other">${full ? "Fuld" : "Vælges af træner"}</span>`;
+        }
+        const names = task.taken_by.length
+          ? `<div class="task-names">${task.taken_by.map(esc).join(", ")}</div>`
+          : "";
+        return `
+          <div class="task">
+            <div class="task-main"><b>${esc(task.name)}</b> <span class="task-count">${count}</span>${names}</div>
+            <div>${action}</div>
+          </div>`;
+      })
+      .join("");
+    return `<div class="tasks"><div class="tasks-head">Opgaver</div>${rows}</div>`;
   }
 
   _toast(message) {
@@ -268,9 +342,10 @@ class HoldsportCard extends HTMLElement {
     let details = "";
     if (expanded) {
       const desc = act.comment ? `<div class="desc">${esc(act.comment)}</div>` : "";
+      const tasks = this._renderTasks(act);
       details =
-        meeting || desc
-          ? `<div class="details">${meeting}${desc}</div>`
+        meeting || desc || tasks
+          ? `<div class="details">${meeting}${desc}${tasks}</div>`
           : `<div class="details empty-details">Ingen yderligere oplysninger</div>`;
     }
 
@@ -400,6 +475,21 @@ const STYLE = `
   .desc { white-space: pre-wrap; margin-bottom: 8px; font-style: italic; overflow-wrap: anywhere; }
   .empty { color: var(--secondary-text-color); padding: 12px 8px; }
   .empty-details { color: var(--secondary-text-color); }
+  .tasks { margin-top: 6px; display: flex; flex-direction: column; gap: 6px; }
+  .tasks-head { font-weight: 500; }
+  .tasks-note { color: var(--secondary-text-color); margin-top: 6px; }
+  .task {
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    background: var(--card-background-color, #fff); border-radius: 8px; padding: 6px 10px;
+    border: 1px solid var(--divider-color, rgba(0,0,0,0.12));
+  }
+  .task-count { color: var(--secondary-text-color); font-size: 0.9em; }
+  .task-names { color: var(--secondary-text-color); font-size: 0.85em; overflow-wrap: anywhere; }
+  .take {
+    border: none; border-radius: 16px; padding: 6px 12px; cursor: pointer; white-space: nowrap;
+    background: var(--primary-color); color: var(--text-primary-color, #fff); font: inherit; font-size: 0.85em;
+  }
+  .take:disabled { opacity: 0.5; cursor: progress; }
   .warn { color: var(--warning-color, #ff9800); padding: 8px; font-size: 0.9em; }
   @media (max-width: 450px) { .details { padding-left: 10px; } }
 `;
@@ -497,7 +587,7 @@ if (!customElements.get("holdsport-card")) {
   window.customCards.push({
     type: "holdsport-card",
     name: "Holdsport",
-    description: "Kommende aktiviteter med til-/afmelding og mødetid",
+    description: "Kommende aktiviteter med til-/afmelding, mødetid og opgaver",
     preview: false,
     documentationURL: "https://github.com/GregersK/ha-holdsport",
   });

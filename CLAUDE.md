@@ -31,6 +31,12 @@ tests/             pytest-homeassistant-custom-component, FakeClient mocker API'
   "Holdsport" (`/holdsport`). Panelet finder profilerne via `hass.entities` (platform holdsport,
   domæne calendar) og viser et `holdsport-card` pr. profil.
 - Registreringen springes over, når `hass.http`/`frontend` ikke er sat op (tests).
+- Kortet registreres også som Lovelace-resource (`_async_ensure_lovelace_resource`, storage-mode),
+  fordi `add_extra_js_url` alene ikke nåede at definere kortet før dashboard-editoren gav op
+  ("Custom element doesn't exist"). Posten opdateres til ny `?v=` ved hver version.
+- Opgaver (`GET/POST /v1/activities/{id}/activity_tasks`) er ikke med i aktivitetslisten; kortet henter
+  dem via `holdsport/tasks`, når en aktivitet foldes ud. Profil-id = `user_id` i `activity_tasks`.
+  API'et har ingen afmelding fra en opgave.
 - Kortet abonnerer med `entity_id` (typisk kalenderen) → entity registry → device → `resolve_device()`.
   Til/afmelding går gennem de almindelige services, så validering og fejltekster er ét sted.
 - Tekst fra Holdsport (navne, steder, beskrivelser) skal gennem `esc()` før den sættes i innerHTML.

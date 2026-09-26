@@ -82,6 +82,7 @@ class FakeClient:
         self.username = username
         self.password = password
         self.set_status = AsyncMock()
+        self.take_task = AsyncMock()
 
     async def async_get_profiles(self):
         if self.password != "pw":
@@ -103,6 +104,24 @@ class FakeClient:
 
     async def async_set_status(self, login, method, path, joined):
         await self.set_status(login, method, path, joined)
+
+    async def async_get_tasks(self, login, activity_id):
+        return TASKS if activity_id == 5 else []
+
+    async def async_take_task(self, login, activity_id, task_id):
+        await self.take_task(login, activity_id, task_id)
+
+
+TASKS = [
+    {"id": 71, "name": "Kiosk", "max_participants": 2, "enable_attend": True,
+     "activity_tasks": [{"id": 1, "user_id": 7, "name": "Anden forælder"}]},
+    {"id": 72, "name": "Billetsalg", "max_participants": 1, "enable_attend": True,
+     "activity_tasks": [{"id": 2, "user_id": CHILD, "name": "Emma"}]},
+    {"id": 73, "name": "Speaker", "max_participants": 1, "enable_attend": True,
+     "activity_tasks": [{"id": 3, "user_id": 8, "name": "Træner"}]},
+    {"id": 74, "name": "Oprydning", "max_participants": None, "enable_attend": False,
+     "activity_tasks": []},
+]
 
 
 CLIENTS = []
@@ -317,3 +336,53 @@ async def test_websocket_subscribe(hass: HomeAssistant, hass_ws_client):
     result = await client.receive_json()
     assert not result["success"]
     assert result["error"]["code"] == "not_found"
+
+
+async def test_tasks(hass: HomeAssistant, hass_ws_client):
+    await _setup(hass)
+    client = CLIENTS[-1]
+    dev = next(d for d in dr.async_get(hass).devices.values() if d.name == "Emma")
+    ws = await hass_ws_client(hass)
+
+    await ws.send_json({"id": 1, "type": "holdsport/tasks", "device_id": dev.id, "activity_id": 5})
+    res = await ws.receive_json()
+    assert res["success"], res
+    tasks = {x["id"]: x for x in res["result"]}
+    assert tasks[71]["can_take"] and tasks[71]["taken_by"] == ["Anden forælder"]
+    assert tasks[72]["mine"] and not tasks[72]["can_take"]
+    assert not tasks[73]["can_take"]  # fuld
+    assert not tasks[74]["can_take"]  # kan ikke vælges selv
+    assert tasks[74]["max_participants"] is None
+
+    await hass.services.async_call(
+        DOMAIN, "take_task", {"device_id": dev.id, "activity_id": 5, "task_id": "71"}, blocking=True
+    )
+    client.take_task.assert_awaited_with(str(CHILD), 5, 71)
+
+    client.take_task.side_effect = HoldsportRejected("fuld")
+    with pytest.raises(HomeAssistantError):
+        await hass.services.async_call(
+            DOMAIN, "take_task", {"device_id": dev.id, "activity_id": 5, "task_id": 73}, blocking=True
+        )
+
+
+async def test_card_registered_as_lovelace_resource(hass: HomeAssistant):
+    from homeassistant.components.lovelace.const import LOVELACE_DATA
+    from homeassistant.setup import async_setup_component
+
+    from custom_components.holdsport import _async_ensure_lovelace_resource
+
+    assert await async_setup_component(hass, "lovelace", {})
+    resources = hass.data[LOVELACE_DATA].resources
+
+    await _async_ensure_lovelace_resource(hass, "/holdsport_static/holdsport-card.js?v=1")
+    await _async_ensure_lovelace_resource(hass, "/holdsport_static/holdsport-card.js?v=1")
+    items = [i for i in resources.async_items() if "holdsport" in i["url"]]
+    assert [(i["url"], i["type"]) for i in items] == [
+        ("/holdsport_static/holdsport-card.js?v=1", "module")
+    ]
+
+    # ny version opdaterer den eksisterende post i stedet for at lave en ny
+    await _async_ensure_lovelace_resource(hass, "/holdsport_static/holdsport-card.js?v=2")
+    items = [i for i in resources.async_items() if "holdsport" in i["url"]]
+    assert [i["url"] for i in items] == ["/holdsport_static/holdsport-card.js?v=2"]
