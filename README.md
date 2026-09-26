@@ -7,7 +7,7 @@ Custom integration der viser træning, kampe og andre aktiviteter fra [Holdsport
 - **Én enhed pr. familiemedlem.** Log ind med forælderens konto og vælg de profiler (børn) du administrerer. Voksne med egen konto tilføjes som en ekstra integration.
 - **Kalender pr. person** (`calendar.<navn>`) med alle aktiviteter på tværs af hold – også historik, når man bladrer tilbage.
 - **Sensorer pr. person:** Næste aktivitet, Næste træning, Næste kamp (timestamp + attributter som hold, sted, mødetid, status og `activity_id`) samt **Mangler svar** (antal kommende aktiviteter uden svar).
-- **Handlinger:** `holdsport.attend` (tilmeld) og `holdsport.decline` (afmeld).
+- **Handlinger:** `holdsport.attend` (tilmeld), `holdsport.decline` (afmeld) og `holdsport.take_task` (tag en opgave).
 - **Holdsport-kort** i sidemenuen og til dashboards med kommende aktiviteter, ✓/✗-knapper og mødetid (se nedenfor).
 - **Mødetid før kampe** kan beregnes automatisk, fx 90 min. før hjemmekampe (se *Indstillinger*).
 
@@ -17,7 +17,7 @@ Integrationen tilføjer selv **Holdsport** i HA's sidemenu med ét kort pr. fami
 
 ## Dashboard-kort
 
-Samme kort kan også lægges på et dashboard. Rediger dashboard → *Tilføj kort* → søg efter **Holdsport**, eller i YAML (kortet skal stå under en visnings `cards:`):
+Samme kort kan også lægges på et dashboard. Integrationen registrerer selv kortet under *Indstillinger → Dashboards → Resources*. Rediger dashboard → *Tilføj kort* → søg efter **Holdsport**, eller i YAML (kortet skal stå under en visnings `cards:`):
 
 ```yaml
 type: custom:holdsport-card
@@ -29,6 +29,7 @@ title: Emma                # valgfri, standard er profilens navn
 - Aktiviteter grupperet pr. dag, farvet efter type (kamp blå, træning grøn, stævne rød, medlemsaktivitet pink).
 - ✓/✗ tilmelder/afmelder med det samme. Betalingsaktiviteter vises som *Svar i appen*.
 - Mødetid står i parentes under klokkeslættet, fx `12.45 (11.15)`. Tryk på en aktivitet for mødested og beskrivelse.
+- **Opgaver** (fx kiosk eller billetsalg under hjemmekampe): tryk på en aktivitet for at se dem og hvem der har taget dem, og tag en opgave med *Tag opgaven*. Man kan ikke melde sig fra en opgave via API'et – det skal ske i Holdsport-appen.
 - Holdsports chat er ikke tilgængelig via API'et og vises derfor ikke.
 
 ## Indstillinger

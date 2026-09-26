@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import logging
 from pathlib import Path
 
 import voluptuous as vol
@@ -32,10 +33,14 @@ from .const import (
     JOINED_DECLINE,
     SERVICE_ATTEND,
     SERVICE_DECLINE,
+    SERVICE_TAKE_TASK,
+    ATTR_TASK_ID,
     device_identifier,
 )
 from .coordinator import HoldsportCoordinator, Profile, resolve_device
 from .websocket import async_register_websocket
+
+_LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = [Platform.CALENDAR, Platform.SENSOR]
 # latest_message: Holdsports chat er ikke tilgængelig via API'et (fjernet i 0.4.0)
@@ -69,6 +74,19 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     for service in (SERVICE_ATTEND, SERVICE_DECLINE):
         hass.services.async_register(DOMAIN, service, _handle, schema=SERVICE_SCHEMA)
 
+    async def _take_task(call: ServiceCall) -> None:
+        coordinator, profile_id = resolve_device(hass, call.data[ATTR_DEVICE_ID])
+        await coordinator.async_take_task(
+            profile_id, call.data[ATTR_ACTIVITY_ID], call.data[ATTR_TASK_ID]
+        )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_TAKE_TASK,
+        _take_task,
+        schema=SERVICE_SCHEMA.extend({vol.Required(ATTR_TASK_ID): vol.Coerce(int)}),
+    )
+
     async_register_websocket(hass)
     await _async_register_card(hass)
     return True
@@ -89,6 +107,7 @@ async def _async_register_card(hass: HomeAssistant) -> None:
     # Versionen i URL'en tvinger browseren til at hente kortet igen efter opdatering
     url = f"{CARD_URL_BASE}/{CARD_FILENAME}?v={integration.version}"
     add_extra_js_url(hass, url)
+    await _async_ensure_lovelace_resource(hass, url)
 
     # "Holdsport" i sidemenuen: et kort pr. familiemedlem, uden dashboard-opsætning
     from homeassistant.components import panel_custom
@@ -102,6 +121,42 @@ async def _async_register_card(hass: HomeAssistant) -> None:
         module_url=url,
         require_admin=False,
     )
+
+
+async def _async_ensure_lovelace_resource(hass: HomeAssistant, url: str) -> None:
+    """Registrer kortet som dashboard-resource (Indstillinger → Dashboards → Resources).
+
+    add_extra_js_url alene når ikke altid at indlæse kortet før dashboardet
+    bygges, så kortet kun virkede efter Holdsport-panelet var åbnet. En resource
+    er den officielle vej. Kun i storage-mode; i YAML-mode styrer brugeren selv.
+    Lovelaces resource-samling er intern API, så fejl her må aldrig stoppe opsætningen.
+    """
+    try:
+        from homeassistant.components.lovelace.const import LOVELACE_DATA
+
+        data = hass.data.get(LOVELACE_DATA)
+        mode = getattr(data, "resource_mode", getattr(data, "mode", None))
+        if data is None or mode != "storage":
+            return
+        resources = data.resources
+        if not resources.loaded:
+            await resources.async_load()
+            resources.loaded = True
+        for item in resources.async_items():
+            if str(item.get("url", "")).startswith(f"{CARD_URL_BASE}/"):
+                if item["url"] != url:
+                    await resources.async_update_item(
+                        item["id"], {"res_type": "module", "url": url}
+                    )
+                return
+        await resources.async_create_item({"res_type": "module", "url": url})
+    except Exception:  # noqa: BLE001
+        _LOGGER.warning(
+            "Kunne ikke registrere Holdsport-kortet som dashboard-resource – "
+            "tilføj %s manuelt under Dashboards → Resources",
+            url,
+            exc_info=True,
+        )
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: HoldsportConfigEntry) -> bool:

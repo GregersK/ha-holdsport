@@ -99,6 +99,24 @@
           "description": "Findes i attributten activity_id på sensorerne."
         }
       }
+    },
+    "take_task": {
+      "name": "Tag opgave",
+      "description": "Meld et familiemedlem på en opgave ved en aktivitet (fx kiosk). Afmelding skal ske i Holdsport-appen.",
+      "fields": {
+        "device_id": {
+          "name": "Familiemedlem",
+          "description": "Holdsport-profilen (enheden)."
+        },
+        "activity_id": {
+          "name": "Aktivitets-id",
+          "description": "Findes i attributten activity_id på sensorerne."
+        },
+        "task_id": {
+          "name": "Opgave-id",
+          "description": "Id fra opgavelisten i Holdsport-kortet."
+        }
+      }
     }
   }
 }

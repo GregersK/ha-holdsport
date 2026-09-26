@@ -110,6 +110,22 @@ class HoldsportClient:
             "GET", f"/v1/teams/{team_id}/activities/{activity_id}", login
         )
 
+    async def async_get_tasks(self, login: str, activity_id: int) -> list[dict[str, Any]]:
+        """Opgaver på en aktivitet (fx kiosk, billetsalg) og hvem der har taget dem."""
+        return (
+            await self._request("GET", f"/v1/activities/{activity_id}/activity_tasks", login)
+            or []
+        )
+
+    async def async_take_task(self, login: str, activity_id: int, task_id: int) -> None:
+        """Meld `login` på en opgave. API'et har ingen afmelding."""
+        await self._request(
+            "POST",
+            f"/v1/activities/{activity_id}/activity_tasks",
+            login,
+            json={"activity_task": {"task_type_id": task_id}},
+        )
+
     async def async_set_status(
         self, login: str, method: str, path: str, joined_status: int
     ) -> None:

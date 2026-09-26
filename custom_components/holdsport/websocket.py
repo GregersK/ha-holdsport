@@ -8,17 +8,42 @@ import voluptuous as vol
 
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import entity_registry as er
 
 from .coordinator import resolve_device
 
 WS_SUBSCRIBE = "holdsport/subscribe"
+WS_TASKS = "holdsport/tasks"
 
 
 @callback
 def async_register_websocket(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_subscribe)
+    websocket_api.async_register_command(hass, ws_tasks)
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): WS_TASKS,
+        vol.Required("device_id"): str,
+        vol.Required("activity_id"): int,
+    }
+)
+@websocket_api.async_response
+async def ws_tasks(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Opgaver på én aktivitet – hentes først når kortet folder aktiviteten ud."""
+    try:
+        coordinator, profile_id = resolve_device(hass, msg["device_id"])
+        tasks = await coordinator.async_get_tasks(profile_id, msg["activity_id"])
+    except HomeAssistantError as err:
+        connection.send_error(msg["id"], "holdsport_error", str(err))
+        return
+    connection.send_result(msg["id"], tasks)
 
 
 @websocket_api.websocket_command(

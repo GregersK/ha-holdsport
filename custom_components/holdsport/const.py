@@ -63,6 +63,8 @@ CARD_FILENAME = "holdsport-card.js"
 
 SERVICE_ATTEND = "attend"
 SERVICE_DECLINE = "decline"
+SERVICE_TAKE_TASK = "take_task"
+ATTR_TASK_ID = "task_id"
 ATTR_DEVICE_ID = "device_id"
 ATTR_ACTIVITY_ID = "activity_id"
 

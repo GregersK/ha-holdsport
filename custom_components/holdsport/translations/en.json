@@ -99,6 +99,24 @@
           "description": "Found in the activity_id attribute of the sensors."
         }
       }
+    },
+    "take_task": {
+      "name": "Take task",
+      "description": "Sign a family member up for a task at an activity (e.g. kiosk). Cancelling must be done in the Holdsport app.",
+      "fields": {
+        "device_id": {
+          "name": "Family member",
+          "description": "The Holdsport profile (device)."
+        },
+        "activity_id": {
+          "name": "Activity ID",
+          "description": "Found in the activity_id attribute of the sensors."
+        },
+        "task_id": {
+          "name": "Task id",
+          "description": "Id from the task list in the Holdsport card."
+        }
+      }
     }
   }
 }
