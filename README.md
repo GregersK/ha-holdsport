@@ -1,5 +1,7 @@
 # Holdsport til Home Assistant
 
+> **English:** Home Assistant integration for [Holdsport](https://holdsport.dk), the Danish team sports platform. Shows training sessions, matches and other activities for every family member, lets you attend/decline, take tasks, and see who is coming – via a calendar, sensors, a sidebar panel and a dashboard card. Log in with your Holdsport account; profiles you manage (e.g. your children) can be selected.
+
 Custom integration der viser træning, kampe og andre aktiviteter fra [Holdsport](https://holdsport.dk) for hele familien – og kan tilmelde/afmelde.
 
 ## Funktioner
