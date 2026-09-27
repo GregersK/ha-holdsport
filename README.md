@@ -28,7 +28,8 @@ title: Emma                # valgfri, standard er profilens navn
 
 - Aktiviteter grupperet pr. dag, farvet efter type (kamp blå, træning grøn, stævne rød, medlemsaktivitet pink).
 - ✓/✗ tilmelder/afmelder med det samme. Betalingsaktiviteter vises som *Svar i appen*.
-- Mødetid står i parentes under klokkeslættet, fx `12.45 (11.15)`. Tryk på en aktivitet for mødested og beskrivelse.
+- Er der en mødetid, står den som den primære tid med starttidspunktet under, fx **11.15** / start 12.45.
+- Tryk på en aktivitet for mødested, beskrivelse og **deltagere** – hvem der er tilmeldt, udvalgt, til rådighed, afmeldt og mangler svar.
 - **Opgaver** (fx kiosk eller billetsalg under hjemmekampe): tryk på en aktivitet for at se dem og hvem der har taget dem, og tag en opgave med *Tag opgaven*. Man kan ikke melde sig fra en opgave via API'et – det skal ske i Holdsport-appen.
 - Holdsports chat er ikke tilgængelig via API'et og vises derfor ikke.
 

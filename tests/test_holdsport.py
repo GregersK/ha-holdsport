@@ -60,6 +60,7 @@ def _training_with_attendees():
         {"id": 3, "name": "C", "status": "Udvalgt", "status_code": 4},
     ]
     act["max_attendees"] = 20
+    act["no_rsvp"] = [{"id": 9, "name": "Zenia"}, {"id": 8, "name": "Bo"}]
     return act
 
 
@@ -323,6 +324,14 @@ async def test_websocket_subscribe(hass: HomeAssistant, hass_ws_client):
     training = acts[1]
     assert training["attending"] == 2  # Tilmeldt + Udvalgt
     assert training["max_attendees"] == 20
+    assert training["participants"] == [
+        {"name": "A", "status_code": 1},
+        {"name": "B", "status_code": 2},
+        {"name": "C", "status_code": 4},
+    ]
+    assert training["no_rsvp"] == ["Bo", "Zenia"]
+    # deltagerlisten sendes kun til kortet – ikke som sensor-attributter
+    assert "participants" not in hass.states.get("sensor.emma_next_training").attributes
     assert "comments" not in training
     assert training["meeting_start"] is None  # slået fra som standard
     assert acts[4]["can_respond"] is False

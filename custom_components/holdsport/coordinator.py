@@ -78,6 +78,9 @@ class Activity:
     max_attendees: int | None = None
     # Beregnet ud fra integrationens indstillinger – kun når Holdsport ikke har en mødetid
     meeting_start: datetime | None = None
+    # (navn, statuskode) for dem der har svaret, og navne på dem der mangler at svare
+    participants: list[tuple[str, int]] = field(default_factory=list)
+    no_rsvp: list[str] = field(default_factory=list)
 
     @property
     def status_text(self) -> str:
@@ -108,11 +111,13 @@ class Activity:
         }
 
     def as_card_dict(self) -> dict[str, Any]:
-        """Alt dashboard-kortet skal bruge, inkl. beskeder."""
+        """Alt dashboard-kortet skal bruge, inkl. deltagerliste (kun til websocket, ikke attributter)."""
         return {
             **self.as_attributes(),
             "event_type_id": self.event_type_id,
             "attending": self.attending,
+            "participants": [{"name": n, "status_code": s} for n, s in self.participants],
+            "no_rsvp": self.no_rsvp,
             "max_attendees": self.max_attendees,
         }
 
@@ -133,6 +138,28 @@ def parse_status(value: Any) -> int:
         return STATUS_FROM_TEXT.get(value.strip().lower(), STATUS_NONE)
     return STATUS_NONE
 
+
+
+def parse_participants(raw_list: Any) -> list[tuple[str, int]]:
+    return sorted(
+        (
+            ((u.get("name") or "").strip(), parse_status(u.get("status_code", u.get("status"))))
+            for u in (raw_list if isinstance(raw_list, list) else [])
+            if (u.get("name") or "").strip()
+        ),
+        key=lambda ns: ns[0].casefold(),
+    )
+
+
+def parse_names(raw_list: Any) -> list[str]:
+    return sorted(
+        (
+            (u.get("name") or "").strip()
+            for u in (raw_list if isinstance(raw_list, list) else [])
+            if (u.get("name") or "").strip()
+        ),
+        key=str.casefold,
+    )
 
 
 def count_attending(raw_list: Any) -> int:
@@ -178,6 +205,8 @@ def parse_activity(raw: dict[str, Any], team_id: int, team_name: str) -> Activit
         action_method=(raw.get("action_method") or "").upper(),
         action_path=raw.get("action_path") or "",
         attending=count_attending(raw.get("activities_users")),
+        participants=parse_participants(raw.get("activities_users")),
+        no_rsvp=parse_names(raw.get("no_rsvp")),
         max_attendees=raw.get("max_attendees") or None,
     )
 
