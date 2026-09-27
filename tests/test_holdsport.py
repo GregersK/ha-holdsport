@@ -395,3 +395,25 @@ async def test_card_registered_as_lovelace_resource(hass: HomeAssistant):
     await _async_ensure_lovelace_resource(hass, "/holdsport_static/holdsport-card.js?v=2")
     items = [i for i in resources.async_items() if "holdsport" in i["url"]]
     assert [i["url"] for i in items] == ["/holdsport_static/holdsport-card.js?v=2"]
+
+
+async def test_card_view_revalidates_instead_of_caching():
+    from aiohttp.test_utils import make_mocked_request
+
+    from custom_components.holdsport.card import HoldsportCardView
+
+    view = HoldsportCardView(b"console.log(1)")
+    resp = await view.get(make_mocked_request("GET", "/holdsport_static/holdsport-card.js"))
+    assert resp.status == 200
+    assert resp.body == b"console.log(1)"
+    assert resp.headers["Cache-Control"] == "no-cache"
+    assert resp.content_type == "application/javascript"
+
+    etag = resp.headers["ETag"]
+    resp = await view.get(
+        make_mocked_request("GET", "/holdsport_static/holdsport-card.js", headers={"If-None-Match": etag})
+    )
+    assert resp.status == 304
+
+    # ny kode = ny ETag, så en browser med den gamle får den nye
+    assert HoldsportCardView(b"console.log(2)")._etag != etag

@@ -59,7 +59,7 @@ JOINED_ATTEND = 1
 JOINED_DECLINE = 2
 
 CARD_URL_BASE = "/holdsport_static"
-CARD_FILENAME = "holdsport-card.js"
+CARD_URL = f"{CARD_URL_BASE}/holdsport-card.js"
 
 SERVICE_ATTEND = "attend"
 SERVICE_DECLINE = "decline"
