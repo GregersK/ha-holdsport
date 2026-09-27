@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import logging
-from pathlib import Path
 
 import voluptuous as vol
 
@@ -19,13 +18,12 @@ from homeassistant.helpers import (
 )
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.typing import ConfigType
-from homeassistant.loader import async_get_integration
 
 from .api import HoldsportAuthError, HoldsportClient, HoldsportError
 from .const import (
     ATTR_ACTIVITY_ID,
     ATTR_DEVICE_ID,
-    CARD_FILENAME,
+    CARD_URL,
     CARD_URL_BASE,
     CONF_PROFILES,
     DOMAIN,
@@ -98,14 +96,13 @@ async def _async_register_card(hass: HomeAssistant) -> None:
     if hass.http is None or "frontend" not in hass.config.components:
         return
     from homeassistant.components.frontend import add_extra_js_url
-    from homeassistant.components.http import StaticPathConfig
 
-    await hass.http.async_register_static_paths(
-        [StaticPathConfig(CARD_URL_BASE, str(Path(__file__).parent / "frontend"), True)]
-    )
-    integration = await async_get_integration(hass, DOMAIN)
-    # Versionen i URL'en tvinger browseren til at hente kortet igen efter opdatering
-    url = f"{CARD_URL_BASE}/{CARD_FILENAME}?v={integration.version}"
+    from .card import CARD_PATH, HoldsportCardView
+
+    content = await hass.async_add_executor_job(CARD_PATH.read_bytes)
+    hass.http.register_view(HoldsportCardView(content))
+    # Fast URL uden version – se HoldsportCardView for hvorfor
+    url = CARD_URL
     add_extra_js_url(hass, url)
     await _async_ensure_lovelace_resource(hass, url)
 

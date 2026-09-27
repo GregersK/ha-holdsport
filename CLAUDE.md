@@ -24,9 +24,11 @@ tests/             pytest-homeassistant-custom-component, FakeClient mocker API'
 
 ## Dashboard-kortet
 
-- Serveres fra `/holdsport_static/holdsport-card.js?v=<manifest-version>` og indlæses via
-  `add_extra_js_url` i `async_setup`. **Bump `version` i manifest.json ved ændringer i kortet**,
-  ellers bruger browseren den cachede udgave.
+- Serveres af `HoldsportCardView` (card.py) på den faste URL `/holdsport_static/holdsport-card.js`
+  med `Cache-Control: no-cache` + ETag. **Ingen version i URL'en**: med `?v=` importerede en
+  browser med en gammel side den gamle URL, og da et custom element kun kan defineres én gang,
+  vandt den gamle kode (sås i 0.6.0: ingen deltagerliste før hård genindlæsning).
+  Indlæses via `add_extra_js_url`, som Lovelace-resource og som panelets `module_url`.
 - Samme modul definerer `holdsport-panel`, registreret med `panel_custom` som sidemenu-punktet
   "Holdsport" (`/holdsport`). Panelet finder profilerne via `hass.entities` (platform holdsport,
   domæne calendar) og viser et `holdsport-card` pr. profil.
