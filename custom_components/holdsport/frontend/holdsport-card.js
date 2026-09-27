@@ -1,5 +1,5 @@
 // Holdsport-kort til Home Assistant.
-// Viser en profils kommende aktiviteter med til-/afmelding, mødetid og opgaver.
+// Viser en profils kommende aktiviteter med til-/afmelding, mødetid, deltagere og opgaver.
 // Data kommer live fra integrationen via websocket-kommandoen holdsport/subscribe.
 
 const TYPE_COLORS = {
@@ -214,6 +214,36 @@ class HoldsportCard extends HTMLElement {
     this._render();
   }
 
+  // Hvem kommer: grupperet efter status, fra aktivitetens activities_users + no_rsvp
+  _renderParticipants(act) {
+    const groups = [
+      [[STATUS_ATTENDING], "Tilmeldt", "ok"],
+      [[STATUS_SELECTED], "Udvalgt", "sel"],
+      [[STATUS_AVAILABLE], "Til rådighed", "avail"],
+      [[STATUS_DECLINED], "Afmeldt", "no"],
+    ];
+    const known = new Set(groups.flatMap((g) => g[0]));
+    const people = act.participants || [];
+    const rows = groups.map(([codes, label, cls]) => [
+      label,
+      cls,
+      people.filter((p) => codes.includes(p.status_code)).map((p) => p.name),
+    ]);
+    rows.push(["Andet", "other", people.filter((p) => !known.has(p.status_code) && p.status_code !== STATUS_NONE).map((p) => p.name)]);
+    rows.push(["Mangler svar", "none", [...people.filter((p) => p.status_code === STATUS_NONE).map((p) => p.name), ...(act.no_rsvp || [])]]);
+    const html = rows
+      .filter(([, , names]) => names.length)
+      .map(
+        ([label, cls, names]) => `
+          <div class="pgroup">
+            <span class="chip ${cls}">${esc(label)} ${names.length}</span>
+            <span class="pnames">${names.map(esc).join(", ")}</span>
+          </div>`,
+      )
+      .join("");
+    return html ? `<div class="people"><div class="tasks-head">Deltagere</div>${html}</div>` : "";
+  }
+
   _renderTasks(act) {
     const entry = this._tasks.get(act.activity_id);
     if (!entry) return "";
@@ -343,18 +373,21 @@ class HoldsportCard extends HTMLElement {
     if (expanded) {
       const desc = act.comment ? `<div class="desc">${esc(act.comment)}</div>` : "";
       const tasks = this._renderTasks(act);
+      const people = this._renderParticipants(act);
       details =
-        meeting || desc || tasks
-          ? `<div class="details">${meeting}${desc}${tasks}</div>`
+        meeting || desc || tasks || people
+          ? `<div class="details">${meeting}${desc}${people}${tasks}</div>`
           : `<div class="details empty-details">Ingen yderligere oplysninger</div>`;
     }
 
     return `
       <div class="act ${started ? "started" : ""} ${expanded ? "open" : ""}" style="--type-color:${color}">
         <div class="row" data-action="toggle" data-id="${act.activity_id}">
-          <div class="time">${esc(time)}${
-            meetAt ? `<div class="meet" title="Mødetid">(${esc(meetAt)})</div>` : ""
-          }</div>
+          ${
+            meetAt
+              ? `<div class="time" title="Mødetid – aktiviteten starter ${esc(time)}">${esc(meetAt)}<div class="start">start ${esc(time)}</div></div>`
+              : `<div class="time">${esc(time)}</div>`
+          }
           <div class="main">
             <div class="name">${esc(act.name)}</div>
             <div class="meta">${meta}${count ? ` · <ha-icon icon="mdi:account-multiple"></ha-icon>${count}` : ""}</div>
@@ -445,8 +478,12 @@ const STYLE = `
   }
   .act.started { opacity: 0.65; }
   .row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; cursor: pointer; }
-  .time { min-width: 44px; font-weight: 500; font-variant-numeric: tabular-nums; padding-top: 1px; }
-  .meet { font-size: 0.8em; font-weight: 400; color: var(--secondary-text-color); }
+  .time { min-width: 44px; font-weight: 500; font-variant-numeric: tabular-nums; padding-top: 1px; white-space: nowrap; }
+  .start { font-size: 0.75em; font-weight: 400; color: var(--secondary-text-color); }
+  .people { margin-top: 6px; display: flex; flex-direction: column; gap: 4px; }
+  .pgroup { line-height: 1.5; }
+  .pgroup .chip { margin-right: 6px; }
+  .pnames { overflow-wrap: anywhere; }
   .main { flex: 1; min-width: 0; }
   .name { font-weight: 500; overflow-wrap: anywhere; }
   .meta { font-size: 0.85em; color: var(--secondary-text-color); overflow-wrap: anywhere; }
