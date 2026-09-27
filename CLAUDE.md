@@ -70,10 +70,9 @@ Demo-login `demo:demo` virker mod `https://api.holdsport.dk/v1/` (read-only brug
 - `status` 3 = "Til rådighed" (udledt af web-appens statusliste, ikke bekræftet i API-docs). 5 = "Ukendt".
 - `activities_users[].status_code` bruges til antal tilmeldte (1 Tilmeldt + 4 Udvalgt).
 
-## Ikke verificeret
+## Verificeret på rigtig konto
 
-- `JOINED_DECLINE = 2` (afmelding) er udledt af status_code 2 = "Afmeldt". Demo-kontoen har ingen fremtidige
-  aktiviteter, så det er ikke testet live. Skal bekræftes på en rigtig aktivitet.
+- Afmelding med `JOINED_DECLINE = 2` virker (bekræftet 2026-09-27 på holdsport.dk).
 
 ## Konventioner
 
