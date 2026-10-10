@@ -117,6 +117,20 @@
           "description": "Id from the task list in the Holdsport card."
         }
       }
+    },
+    "available": {
+      "name": "Available",
+      "description": "Mark a family member as available for an activity with team selection (e.g. a match where the coach picks the team).",
+      "fields": {
+        "device_id": {
+          "name": "Family member",
+          "description": "The Holdsport profile (device)."
+        },
+        "activity_id": {
+          "name": "Activity ID",
+          "description": "Found in the activity_id attribute of the sensors."
+        }
+      }
     }
   }
 }

@@ -28,8 +28,10 @@ from .const import (
     CONF_PROFILES,
     DOMAIN,
     JOINED_ATTEND,
+    JOINED_AVAILABLE,
     JOINED_DECLINE,
     SERVICE_ATTEND,
+    SERVICE_AVAILABLE,
     SERVICE_DECLINE,
     SERVICE_TAKE_TASK,
     ATTR_TASK_ID,
@@ -39,6 +41,12 @@ from .coordinator import HoldsportCoordinator, Profile, resolve_device
 from .websocket import async_register_websocket
 
 _LOGGER = logging.getLogger(__name__)
+
+SERVICE_JOINED = {
+    SERVICE_ATTEND: JOINED_ATTEND,
+    SERVICE_DECLINE: JOINED_DECLINE,
+    SERVICE_AVAILABLE: JOINED_AVAILABLE,
+}
 
 PLATFORMS = [Platform.CALENDAR, Platform.SENSOR]
 # latest_message: Holdsports chat er ikke tilgængelig via API'et (fjernet i 0.4.0)
@@ -65,11 +73,11 @@ type HoldsportConfigEntry = ConfigEntry[HoldsportRuntime]
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     async def _handle(call: ServiceCall) -> None:
-        joined = JOINED_ATTEND if call.service == SERVICE_ATTEND else JOINED_DECLINE
+        joined = SERVICE_JOINED[call.service]
         coordinator, profile_id = resolve_device(hass, call.data[ATTR_DEVICE_ID])
         await coordinator.async_respond(profile_id, call.data[ATTR_ACTIVITY_ID], joined)
 
-    for service in (SERVICE_ATTEND, SERVICE_DECLINE):
+    for service in SERVICE_JOINED:
         hass.services.async_register(DOMAIN, service, _handle, schema=SERVICE_SCHEMA)
 
     async def _take_task(call: ServiceCall) -> None:

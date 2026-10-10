@@ -28,6 +28,8 @@ from .api import (
 from .const import (
     ACTIVITIES_PER_PAGE,
     ATTENDING_STATUSES,
+    REGISTRATION_NORMAL,
+    STATUS_AVAILABLE,
     CALENDAR_MAX_PAGES,
     CONF_MATCH_MEETING_MINUTES,
     CONF_MATCH_MEETING_PLACES,
@@ -78,6 +80,7 @@ class Activity:
     max_attendees: int | None = None
     # Beregnet ud fra integrationens indstillinger – kun når Holdsport ikke har en mødetid
     meeting_start: datetime | None = None
+    registration_type: int = 0
     # (navn, statuskode) for dem der har svaret, og navne på dem der mangler at svare
     participants: list[tuple[str, int]] = field(default_factory=list)
     no_rsvp: list[str] = field(default_factory=list)
@@ -85,6 +88,13 @@ class Activity:
     @property
     def status_text(self) -> str:
         return STATUS_TEXT.get(self.status, str(self.status))
+
+    @property
+    def can_be_available(self) -> bool:
+        """Kan man melde sig "til rådighed" (kun ved aktiviteter med udtagelse)."""
+        return self.can_respond and (
+            self.registration_type != REGISTRATION_NORMAL or self.status == STATUS_AVAILABLE
+        )
 
     @property
     def can_respond(self) -> bool:
@@ -107,6 +117,7 @@ class Activity:
             "meeting_place": self.pickup_place,
             "comment": self.comment,
             "can_respond": self.can_respond,
+            "can_be_available": self.can_be_available,
             "meeting_start": self.meeting_start.isoformat() if self.meeting_start else None,
         }
 
@@ -206,6 +217,7 @@ def parse_activity(raw: dict[str, Any], team_id: int, team_name: str) -> Activit
         action_path=raw.get("action_path") or "",
         attending=count_attending(raw.get("activities_users")),
         participants=parse_participants(raw.get("activities_users")),
+        registration_type=int(raw.get("registration_type") or 0),
         no_rsvp=parse_names(raw.get("no_rsvp")),
         max_attendees=raw.get("max_attendees") or None,
     )
