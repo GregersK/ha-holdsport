@@ -18,6 +18,13 @@ const STATUS_SELECTED = 4;
 
 const UNLIMITED_ATTENDEES = 999;
 
+// Knap/handling -> den status Holdsport skal ende med
+const RSVP_STATUS = {
+  attend: STATUS_ATTENDING,
+  decline: STATUS_DECLINED,
+  available: STATUS_AVAILABLE,
+};
+
 const esc = (s) =>
   String(s ?? "").replace(
     /[&<>"']/g,
@@ -172,10 +179,10 @@ class HoldsportCard extends HTMLElement {
       return;
     }
 
-    if (action === "attend" || action === "decline") {
+    if (action in RSVP_STATUS) {
       ev.stopPropagation();
       if (this._pending.has(id) || !this._data) return;
-      this._pending.set(id, action === "attend" ? STATUS_ATTENDING : STATUS_DECLINED);
+      this._pending.set(id, RSVP_STATUS[action]);
       this._render();
       try {
         await this._hass.callService("holdsport", action, {
@@ -365,6 +372,12 @@ class HoldsportCard extends HTMLElement {
       buttons = `
         <button class="rsvp yes ${attending ? "on" : ""}" data-action="attend" data-id="${act.activity_id}" ${dis} title="Tilmeld">
           <ha-icon icon="mdi:check"></ha-icon></button>
+        ${
+          act.can_be_available
+            ? `<button class="rsvp avail ${status === STATUS_AVAILABLE ? "on" : ""}" data-action="available" data-id="${act.activity_id}" ${dis} title="Til rådighed">
+          <ha-icon icon="mdi:hand-back-right-outline"></ha-icon></button>`
+            : ""
+        }
         <button class="rsvp no ${status === STATUS_DECLINED ? "on" : ""}" data-action="decline" data-id="${act.activity_id}" ${dis} title="Afmeld">
           <ha-icon icon="mdi:close"></ha-icon></button>`;
     }
@@ -505,6 +518,7 @@ const STYLE = `
   .rsvp ha-icon { --mdc-icon-size: 20px; }
   .rsvp.yes.on { background: var(--success-color, #43a047); border-color: transparent; color: #fff; }
   .rsvp.no.on { background: var(--error-color, #db4437); border-color: transparent; color: #fff; }
+  .rsvp.avail.on { background: #00897b; border-color: transparent; color: #fff; }
   .rsvp:disabled { opacity: 0.5; cursor: progress; }
   .chip.app, .chip.other { background: var(--disabled-color, #9e9e9e); }
   .details { padding: 0 10px 10px 64px; font-size: 0.9em; }

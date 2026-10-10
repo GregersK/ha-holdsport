@@ -117,6 +117,20 @@
           "description": "Id fra opgavelisten i Holdsport-kortet."
         }
       }
+    },
+    "available": {
+      "name": "Til rådighed",
+      "description": "Meld et familiemedlem til rådighed på en aktivitet med udtagelse (fx kamp, hvor træneren vælger holdet).",
+      "fields": {
+        "device_id": {
+          "name": "Familiemedlem",
+          "description": "Holdsport-profilen (enheden)."
+        },
+        "activity_id": {
+          "name": "Aktivitets-id",
+          "description": "Findes i attributten activity_id på sensorerne."
+        }
+      }
     }
   }
 }

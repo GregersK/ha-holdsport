@@ -27,7 +27,7 @@ EVENT_TYPE_MEMBER_ACTIVITY = 9  # Medlemsaktivitet
 STATUS_NONE = 0
 STATUS_ATTENDING = 1
 STATUS_DECLINED = 2
-STATUS_AVAILABLE = 3  # "Til rådighed" – udledt af web-appens statusliste
+STATUS_AVAILABLE = 3  # "Til rådighed" (bekræftet: API'ets status-tekst for kode 3)
 STATUS_SELECTED = 4
 STATUS_UNKNOWN = 5
 
@@ -57,12 +57,19 @@ STATUS_FROM_TEXT = {
 # 1 = tilmeld er dokumenteret. 2 = afmeld svarer til status_code 2 ("Afmeldt").
 JOINED_ATTEND = 1
 JOINED_DECLINE = 2
+# 3 = til rådighed, samme kode som status. Kun muligt når registration_type != 0
+JOINED_AVAILABLE = 3
+
+# registration_type 0 = almindelig til-/afmelding. Andre værdier (set: 1, 2, 5) er aktiviteter
+# med udtagelse, hvor man også kan melde sig til rådighed.
+REGISTRATION_NORMAL = 0
 
 CARD_URL_BASE = "/holdsport_static"
 CARD_URL = f"{CARD_URL_BASE}/holdsport-card.js"
 
 SERVICE_ATTEND = "attend"
 SERVICE_DECLINE = "decline"
+SERVICE_AVAILABLE = "available"
 SERVICE_TAKE_TASK = "take_task"
 ATTR_TASK_ID = "task_id"
 ATTR_DEVICE_ID = "device_id"

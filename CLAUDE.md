@@ -67,7 +67,9 @@ Demo-login `demo:demo` virker mod `https://api.holdsport.dk/v1/` (read-only brug
 - `comments[]` er tom på rigtige konti (kun demo-kontoens gamle data har indhold). Holdsports chat
   findes ikke i API'et – kun i web-appens interne API, som vi ikke bruger. Beskeder blev fjernet i 0.4.0.
 - `max_attendees` 999 = ingen grænse.
-- `status` 3 = "Til rådighed" (udledt af web-appens statusliste, ikke bekræftet i API-docs). 5 = "Ukendt".
+- `status` 3 = "Til rådighed" (API'ets egen statustekst for kode 3). 5 = "Ukendt".
+- `registration_type` 0 = almindelig til-/afmelding. Andre værdier (set på demo: 1, 2, 5) = aktivitet med
+  udtagelse; kun her vises "Til rådighed" (`joined_status` 3, service `holdsport.available`).
 - `activities_users[].status_code` bruges til antal tilmeldte (1 Tilmeldt + 4 Udvalgt).
 
 ## Verificeret på rigtig konto

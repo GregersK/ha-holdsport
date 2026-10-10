@@ -74,7 +74,7 @@ CHILD_ACTS = [
     # hjemmekamp uden mødetid fra Holdsport -> mødetid kan beregnes
     {**_act(5, "Kamp i Odense", 8, 1, "Kamp", status=1, method="PUT",
             path="/v1/activities/5/activities_users/998"),
-     "place": "Spar Nord Arena, Odense", "pickup_time": ""},
+     "place": "Spar Nord Arena, Odense", "pickup_time": "", "registration_type": 2},
 ]
 
 
@@ -227,6 +227,10 @@ async def test_services(hass: HomeAssistant):
     with pytest.raises(ServiceValidationError):
         await hass.services.async_call(DOMAIN, "attend", {"device_id": dev.id, "activity_id": 4}, blocking=True)
 
+    # til rådighed på en kamp med udtagelse (registration_type 2)
+    await hass.services.async_call(DOMAIN, "available", {"device_id": dev.id, "activity_id": 5}, blocking=True)
+    client.set_status.assert_awaited_with(str(CHILD), "PUT", "/v1/activities/5/activities_users/998", 3)
+
     client.set_status.side_effect = HoldsportRejected("x")
     with pytest.raises(HomeAssistantError):
         await hass.services.async_call(DOMAIN, "attend", {"device_id": dev.id, "activity_id": 1}, blocking=True)
@@ -335,6 +339,8 @@ async def test_websocket_subscribe(hass: HomeAssistant, hass_ws_client):
     assert "comments" not in training
     assert training["meeting_start"] is None  # slået fra som standard
     assert acts[4]["can_respond"] is False
+    assert acts[5]["can_be_available"] is True  # udtagelse
+    assert acts[1]["can_be_available"] is False  # almindelig træning
 
     # Opdatering af coordinatoren skubbes ud til kortet
     coordinator = hass.config_entries.async_entries(DOMAIN)[0].runtime_data.coordinator

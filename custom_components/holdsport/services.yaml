@@ -41,3 +41,16 @@ take_task:
       example: 906194
       selector:
         text:
+
+available:
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: holdsport
+    activity_id:
+      required: true
+      example: 52272675
+      selector:
+        text:
